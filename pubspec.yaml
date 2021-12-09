@@ -1,12 +1,7 @@
 name: lint_hard
-description: All the lints except where they clash.
+version: 1.0.0
 homepage: https://github.com/noojee/lint_hard.git
+description: All the lints except where they clash.
 repository: https://github.com/noojee/lint_hard.git
-version: 1.0.1
-
-environment:
+environment: 
   sdk: '>=2.12.0 <3.0.0'
-
-# dependencies:
-# dev_dependencies:
-# NOTE: Code is not allowed in this package. Do not add dependencies.
