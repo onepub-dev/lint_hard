@@ -1,5 +1,5 @@
 name: example
-description: An example project that uses Dart recommended lints.
+description: An example project that uses lint_hard.
 version: 0.1.0
 publish_to: none
 

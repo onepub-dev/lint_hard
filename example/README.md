@@ -1,1 +1,1 @@
-An example project that uses Dart recommended lints.
+An example project that uses lint_hard.

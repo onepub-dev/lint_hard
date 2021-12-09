@@ -1,7 +1,7 @@
-name: lints
-description: Official Dart lint rules. Defines the 'core' and 'recommended' set of lints suggested by the Dart team.
-homepage: https://github.com/dart-lang/lints
-repository: https://github.com/dart-lang/lints
+name: lint_hard
+description: All the lints except where they clash.
+homepage: https://github.com/noojee/lint_hard.git
+repository: https://github.com/noojee/lint_hard.git
 version: 1.0.1
 
 environment:
