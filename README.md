@@ -1,12 +1,23 @@
 # Not an offical lint package
 
-This linter inclues every non-clashing lints.
+The objective of lint_hard to improve code quality and consistency and turn runtime errors into compile time errors.
 
-## How to enable these lints
+Lint Hard includes every non-clashing dart lint and enables strong mode type checks.
 
-To enable these lints for your apps or package:
+```yaml
+strong-mode:
+    implicit-casts: false
+    implicit-dynamic: false
+```
 
-1. Checking any existing code changes.
+This requires you to do a little more work as your code but will significantly reduce runtime errors saving far more time than you will spend cleaning your lints.
+
+
+## How to enable Lint Hard
+
+To enable lint_hard for your apps or package:
+
+1. Check in any existing code changes.
 
 2.  In a terminal, located at the root of your package, run this command:
 
@@ -23,13 +34,13 @@ To enable these lints for your apps or package:
 
 4. run dart fix
 
-The dart fix command will apply a number of automated fixes based on the lint_hard settings.
+    The dart fix command will apply a number of automated fixes based on the lint_hard settings.
 
-Run:
-```bash
-dart fix --apply
-```
-Re-run dart fix until it reports 'Nothing to fix!'
+    Run:
+    ```bash
+    dart fix --apply
+    ```
+    Re-run dart fix until it reports 'Nothing to fix!'
 
 ## Customizing the predefined lint sets
 
