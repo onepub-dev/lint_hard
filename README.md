@@ -1,13 +1,13 @@
 # Lint Hard 
 
-The objective of lint_hard to improve code quality, consistency and turn runtime errors into compile time errors.
+The objective of lint_hard is to improve code quality, consistency and turn runtime errors into compile time errors.
 
 
 Lint Hard turns many of the common runtime errors into compile time errors. The rule of thumb is that it is 10 times harder to fix a runtime error than a compiler error. Lint Hard will save you time and frustration.  
 
-Using Lint Hard will require you to do a little more work as you code but will significantly reduce runtime errors saving far more time than you will spend cleaning your lints. The `dart fix` command also automates fixing many of most common lints reducing the work load.
+Using Lint Hard will require you to do a little more work as you code but will significantly reduce runtime errors saving far more time than you will spend cleaning your lints. The `dart fix` command also automates fixing many of the most common lints reducing the workload.
 
-Lint Hard forces you to use consistant standards across your code base which makes it easier for other developers to read your code. It will aslo help when you come back to your code in 12 months time.
+Lint Hard forces you to use consistent standards across your code base which makes it easier for other developers to read your code. It will also help when you come back to your code in 12 months time.
 
 ## drop in replacement
 You can use Lint Hard as a drop in replacement for your existing lint package (pedantic, lints, flutter_lints ...).
@@ -32,9 +32,9 @@ Or you can just jump to the bottom of this page to [install](#installing-lint-ha
 
 ## dart format
 We strongly recommend that you use `dart format` to format your code.  Whilst personally I don't like some of the formatting decisions imposed by dart format, consistency is more important.  Don't fight this one. Just run `dart format` with no options. You will get used to the format and it makes sharing code with other developers easier. 
-Using `dart format` will also make it easier for you to read other developers code as `dart format` is almost universally used in the developer community.
+Using `dart format` will also make it easier for you to read other developer's code as `dart format` is almost universally used in the Dart community.
 
-dart format will improve your commit history as it won't be fouled with format differences. This is particularly imporant in a team project but will render dividends even if you work alone. 
+dart format will improve your commit history as it won't be fouled with format differences. This is particularly important  in a team project but will render dividends even if you work alone. 
 
 Use an IDE like vs-code that automatically formats your code each time you save it.
 
@@ -57,7 +57,7 @@ This one probably doesn't need to be said, but just in case...
 If you haven't already moved your project to Not Null by Default (nnbd) now is the time to do it.
 We do recommend applying Lint Hard to your project first and then doing the nnbd conversion. A cleaner code base will help the nnbd migration tool.
 
-Now you have nnbd enbabled try to minimize the use of '?' operator. Use non-nullable types as your default. Only use a nullable type if the variable really needs to be nullable.
+Now you have nnbd enabled, try to minimize the use of '?' operator. Use non-nullable types as your default. Only use a nullable type if the variable really needs to be nullable.
 
 Use techniques such as default values and (carefully) the `late` keyword.
 
