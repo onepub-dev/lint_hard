@@ -1,7 +1,19 @@
-# Not an offical lint package
+# Lint Hard 
 
-The objective of lint_hard to improve code quality and consistency and turn runtime errors into compile time errors.
+The objective of lint_hard to improve code quality, consistency and turn runtime errors into compile time errors.
 
+
+Lint Hard turns many of the common runtime errors into compile time errors. The rule of thumb is that it is 10 times harder to fix a runtime error than a compiler error. Lint Hard will save you time and frustration.  
+
+Using Lint Hard will require you to do a little more work as you code but will significantly reduce runtime errors saving far more time than you will spend cleaning your lints. The `dart fix` command also automates fixing many of most common lints reducing the work load.
+
+Lint Hard forces you to use consistant standards across your code base which makes it easier for other developers to read your code. It will aslo help when you come back to your code in 12 months time.
+
+## drop in replacement
+You can use Lint Hard as a drop in replacement for your existing lint package (pedantic, lints, flutter_lints ...).
+
+
+## what lints are included
 Lint Hard includes every non-clashing dart lint and enables strong mode type checks.
 
 ```yaml
@@ -10,29 +22,82 @@ strong-mode:
     implicit-dynamic: false
 ```
 
-This requires you to do a little more work as your code but will significantly reduce runtime errors saving far more time than you will spend cleaning your lints.
+You can see the full set of lints in the analysis_options.yaml file.
+
+## other improvements
+
+The Lint Hard project also offers the following advice to help you improve the overall quality of your project.
+
+Or you can just jump to the bottom of this page to [install](#installing-lint-hard) Lint Hard.
+
+## dart format
+We strongly recommend that you use `dart format` to format your code.  Whilst personally I don't like some of the formatting decisions imposed by dart format, consistency is more important.  Don't fight this one. Just run `dart format` with no options. You will get used to the format and it makes sharing code with other developers easier. 
+Using `dart format` will also make it easier for you to read other developers code as `dart format` is almost universally used in the developer community.
+
+dart format will improve your commit history as it won't be fouled with format differences. This is particularly imporant in a team project but will render dividends even if you work alone. 
+
+Use an IDE like vs-code that automatically formats your code each time you save it.
+
+**_Only commit code that has been formatted._**
 
 
-## How to enable Lint Hard
+## a word to JavaScript developers
+If you are coming from the JavaScript world, enforcing type declarations may initially feel burdensome but you will quickly see that it allows you to develop faster and release quality code sooner.   
 
-To enable lint_hard for your apps or package:
+## avoid dynamic and Object types
+
+For the most part you should never use the dynamic type and rarely use the Object type.
+
+There are exceptions to these rules such as when parsing json dart. But you should always try to use an actual type. dynamic and Object should be last resorts.
+
+## Use nnbd
+
+This one probably doesn't need to be said, but just in case...
+
+If you haven't already moved your project to Not Null by Default (nnbd) now is the time to do it.
+We do recommend applying Lint Hard to your project first and then doing the nnbd conversion. A cleaner code base will help the nnbd migration tool.
+
+Now you have nnbd enbabled try to minimize the use of '?' operator. Use non-nullable types as your default. Only use a nullable type if the variable really needs to be nullable.
+
+Use techniques such as default values and (carefully) the `late` keyword.
+
+
+## installing Lint Hard
+
+To install lint_hard into your app or package:
 
 1. Check in any existing code changes.
 
-2.  In a terminal, located at the root of your package, run this command:
+2. run dart format
+
+    ```terminal
+    dart format
+    ```
+3. Check in the formatted code
+
+    If you already use dart format you can skip this step.
+    If you don't currently use dart format this step will make it easier to diff your lint changes as they won't be mingled with format changes.
+    
+4.  In a terminal, located at the root of your package, run this command:
 
     ```terminal
     dart pub add --dev lint_hard
     ```
 
-3.  Create or modify your `analysis_options.yaml` file in the root of your project, that
-    includes the lint_hard package:
+5.  Create or modify the `analysis_options.yaml` file in the root of your project:
 
     ```yaml
     include: package:lint_hard/all.yaml
     ```
 
-4. run dart fix
+5. Remove your existing linter
+
+    If you are using another linter such as lints, pedantic, flutter_lints etc. now is the time to remove it.
+    Your existing lint package should be listed in the dev_dependencies section of your projects pubspec.yaml.
+    
+    If you have been using the pedantic package it may be in the dependencies section. Remove it also.
+    
+5. run dart fix
 
     The dart fix command will apply a number of automated fixes based on the lint_hard settings.
 
@@ -42,9 +107,23 @@ To enable lint_hard for your apps or package:
     ```
     Re-run dart fix until it reports 'Nothing to fix!'
 
-## Customizing the predefined lint sets
+6. run dart format
 
-You can customize the predefined lint sets, both to disable one or more of the
-lints included, or to add additional lints. For details see [customizing static
+    Finally run `dart format` over your code. Ideally you should be using an IDE that automatically formats your code whenever you save.
+    
+7. avoid_print for Flutter users
+
+    Flutter users may want to add the following to your project's analysis_options.yaml
+    ```
+    linter:
+      rules:
+        avoid_print: true  
+    ```
+
+
+## customizing the predefined lint sets
+
+You can customize the predefined lint set, both to disable a
+lint or to add additional lints. For details see [customizing static
 analysis].
 
