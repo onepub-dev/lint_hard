@@ -1,3 +1,14 @@
+
+analyzer:
+  language:
+    strict-raw-types: true
+    strict-inference: true
+    # only available from dart 2.16
+    # strict-casts: true
+  strong-mode:
+    implicit-casts: false
+    implicit-dynamic: false
+
 linter:
   rules:
     always_declare_return_types : true
@@ -178,7 +189,3 @@ linter:
     
     
 
-analyzer:
-  strong-mode:
-    implicit-casts: false
-    implicit-dynamic: false

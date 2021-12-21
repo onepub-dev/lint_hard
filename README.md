@@ -1,7 +1,9 @@
 # Lint Hard 
 
-The objective of lint_hard is to improve code quality, consistency and turn runtime errors into compile time errors.
+The objective of lint_hard is to reduced the accumulation of technical debt by improving code quality and consistency whilst turning runtime errors into compile time errors.
 
+
+Lint Hard employs strong mode type saftey to improve code clarity and remove 'ambiguity of intent' found in typeless or softly typed code.
 
 Lint Hard turns many of the common runtime errors into compile time errors. The rule of thumb is that it is 10 times harder to fix a runtime error than a compiler error. Lint Hard will save you time and frustration.  
 
