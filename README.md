@@ -52,6 +52,15 @@ For the most part you should never use the dynamic type and rarely use the Objec
 
 There are exceptions to these rules such as when parsing json dart. But you should always try to use an actual type. dynamic and Object should be last resorts.
 
+## Adjustements for package developers
+
+If you are building a dart package then you should be adding documentation to all of your public methods.
+To ensure you do this consistently add the following to you analysis_options.yaml:
+
+linter:
+  rules:
+    public_member_api_docs : true 
+
 ## Use nnbd
 
 This one probably doesn't need to be said, but just in case...
