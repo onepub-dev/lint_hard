@@ -67,6 +67,7 @@ linter:
     curly_braces_in_flow_control_structures : true
     diagnostic_describe_all_properties : true
     directives_ordering : true
+    discarded_futures: true
     do_not_use_environment : true
     empty_catches : true 
     empty_constructor_bodies : true 
