@@ -1,3 +1,9 @@
+# 2.0.0
+- updated list of lints to support the latest .
+- Added discared futures.
+- Added copyright notices.
+- test for unawaited futures.
+
 # 1.0.4
 - added advise for package maintianers.
 
