@@ -1,3 +1,6 @@
+# 2.1.0
+- Added additional lints for upcomming 2.18 and 2.19 releases.
+
 # 2.0.0
 - updated list of lints to support the latest .
 - Added discared futures.
