@@ -1,3 +1,7 @@
+# 2.1.1
+- improved the readme.
+- removed invariant_booleans as it has been deprecated.
+
 # 2.1.0
 - Added additional lints for upcomming 2.18 and 2.19 releases.
 
