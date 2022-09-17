@@ -19,7 +19,12 @@ You can use Lint Hard as a drop in replacement for your existing lint package (p
 Lint Hard includes every non-clashing dart lint and enables strong mode type checks.
 
 ```yaml
-strong-mode:
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  strong-mode:
     implicit-casts: false
     implicit-dynamic: false
 ```
