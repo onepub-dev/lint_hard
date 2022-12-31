@@ -1,7 +1,7 @@
 name: lint_hard
-version: 2.1.1
+version: 3.0.0-beta.1
 homepage: https://github.com/noojee/lint_hard.git
 description: All the lints except where they clash.
 repository: https://github.com/noojee/lint_hard.git
 environment: 
-  sdk: '>=2.12.0 <3.0.0'
+  sdk: '>=2.19.0-444.2.beta <3.0.0'

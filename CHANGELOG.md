@@ -1,3 +1,6 @@
+# 3.0.0-beta.1
+- adde latest lints from dart 2.19 and upgraded minimum sdk version to 2.19.
+
 # 2.1.1
 - improved the readme.
 - removed invariant_booleans as it has been deprecated.
