@@ -105,7 +105,7 @@ linter:
     no_default_cases : true
     no_duplicate_case_values : true
     no_leading_underscores_for_library_prefixes : true
-    no_leading_underscores_for_local_identifiers : true
+    no_leading_underscores_for_local_identifiers : false
     no_logic_in_create_state : true
     no_runtimeType_toString : true
     non_constant_identifier_names : true
