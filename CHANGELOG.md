@@ -1,5 +1,9 @@
+# 3.0.0-beta.2
+- disabled no_leading_underscores_for_local_identifiers as its useful
+in callbacks that have a parameter we don't want to use.
+
 # 3.0.0-beta.1
-- adde latest lints from dart 2.19 and upgraded minimum sdk version to 2.19.
+- added latest lints from dart 2.19 and upgraded minimum sdk version to 2.19.
 
 # 2.1.1
 - improved the readme.
