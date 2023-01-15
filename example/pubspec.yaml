@@ -3,7 +3,7 @@ version: 0.1.1
 publish_to: none
 description: An example project that uses lint_hard.
 environment: 
-  sdk: '>=2.10.0 <3.0.0'
+  sdk: '>=2.18.0 <3.0.0'
 dev_dependencies: 
   lint_hard: 
     path: ..
