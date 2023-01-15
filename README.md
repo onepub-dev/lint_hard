@@ -127,13 +127,13 @@ To install lint_hard into your app or package:
 
     Finally run `dart format` over your code. Ideally you should be using an IDE that automatically formats your code whenever you save.
     
-7. avoid_print for Flutter users
+7. avoid_print for console users
 
-    Flutter users may want to add the following to your project's analysis_options.yaml
+    Console apps developers should add the following to your project's analysis_options.yaml
     ```
     linter:
       rules:
-        avoid_print: true  
+        avoid_print: false  
     ```
 
 
