@@ -1,3 +1,7 @@
+# 3.0.0-beta.4
+- removed strong mode as it is deprecaed in favour of the new
+- removed implict-casts as its no longer required and has been removed in 3.x
+
 # 3.0.0-beta.2
 - disabled no_leading_underscores_for_local_identifiers as its useful
 in callbacks that have a parameter we don't want to use.
