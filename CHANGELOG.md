@@ -1,3 +1,6 @@
+# 3.0.1
+moved to stable 2.19
+
 # 3.0.0-beta.4
 - removed strong mode as it is deprecaed in favour of the new
 - removed implict-casts as its no longer required and has been removed in 3.x
