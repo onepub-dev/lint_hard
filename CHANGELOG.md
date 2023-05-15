@@ -1,3 +1,7 @@
+# 4.0.0
+- removed prefer_foreach because I prefer a for loop.
+- upgraded to dart 3.0
+
 # 3.0.1
 moved to stable 2.19
 
