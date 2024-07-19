@@ -1,3 +1,6 @@
+# 5.0.0
+- added new 3.0, 3.1 lints from the linter project
+
 # 4.0.0
 - removed prefer_foreach because I prefer a for loop.
 - upgraded to dart 3.0
