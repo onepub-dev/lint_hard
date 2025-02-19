@@ -1,3 +1,6 @@
+# 6.0.0
+- added 3.7 lints
+
 # 5.0.0
 - added new 3.0, 3.1 lints from the linter project
 
