@@ -143,3 +143,9 @@ You can customize the predefined lint set, both to disable a
 lint or to add additional lints. For details see [customizing static
 analysis].
 
+
+# Updating lint_hard
+We need to keep lint_hard up to date with the latest list of lints.
+
+We can find a complete set of lints at:
+[All Lint Rules](https://dart.dev/tools/linter-rules/all)
