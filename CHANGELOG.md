@@ -1,3 +1,10 @@
+# 6.1.0
+
+Added new lints:
+- omit_obvious_property_types
+- deprecated_member_use_from_same_package
+- unsafe_variance
+
 # 6.0.0
 - added 3.7 lints
 
