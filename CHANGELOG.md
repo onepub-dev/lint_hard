@@ -1,3 +1,7 @@
+# 6.1.1
+- removed unsafe_variance. It's experimental and the suggested fixes
+ seem overly complicated and you still have to suppress the warning.
+
 # 6.1.0
 
 Added new lints:
