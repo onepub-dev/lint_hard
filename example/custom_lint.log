@@ -1,0 +1,17 @@
+[custom_lint] 2025-08-09T10:59:41.805139 lib/custom_lint_client.dart:4:8: Error: Error when reading '/home/bsutton/git/lint_hard/lib/lint_hard.dart': No such file or directory
+[custom_lint] 2025-08-09T10:59:41.805139 import 'package:lint_hard/lint_hard.dart' as lint_hard;
+[custom_lint] 2025-08-09T10:59:41.805139        ^
+[custom_lint] 2025-08-09T10:59:41.805139 lib/custom_lint_client.dart:16:29: Error: Undefined name 'createPlugin'.
+[custom_lint] 2025-08-09T10:59:41.805139     {'lint_hard': lint_hard.createPlugin,
+[custom_lint] 2025-08-09T10:59:41.805139                             ^^^^^^^^^^^^
+[custom_lint] 2025-08-09T10:59:41.805139
+[custom_lint] 2025-08-09T10:59:41.805139
+Failed to start pluginsThe request analysis.setContextRoots failed with the following error:
+RequestErrorCode.PLUGIN_ERROR
+Bad state: Failed to start the plugins.
+at:
+#0      SocketCustomLintServerToClientChannel._checkInitializationFail.<anonymous closure> (package:custom_lint/src/v2/server_to_client_channel.dart:223:11)
+<asynchronous suspension>
+#1      Future.any.onValue (dart:async/future.dart:616:5)
+<asynchronous suspension>
+

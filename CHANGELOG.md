@@ -1,3 +1,8 @@
+# 6.2.0
+- added custom lint 'fields_first_constructors_next' which places
+ fields before constructors so that the state of a class is 
+ at the top and together.
+
 # 6.1.1
 - removed unsafe_variance. It's experimental and the suggested fixes
  seem overly complicated and you still have to suppress the warning.

@@ -5,6 +5,8 @@ analyzer:
     strict-casts: true
     strict-inference: true
     strict-raw-types: true
+  plugins:
+    - custom_lint
 
 linter:
   rules:
@@ -172,7 +174,7 @@ linter:
     sized_box_shrink_expand : true
     slash_for_doc_comments : true
     sort_child_properties_last : true
-    sort_constructors_first : true
+    # sort_constructors_first : true
     sort_pub_dependencies : true
     sort_unnamed_constructors_first : true
     strict_top_level_inference : true
@@ -236,3 +238,8 @@ linter:
     use_truncating_division : true
     valid_regexps : true
     void_checks : true
+
+
+custom_lint:
+  rules:
+    fields_first_constructors_next: true
