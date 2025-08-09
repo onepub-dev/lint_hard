@@ -6,7 +6,7 @@ repository: https://github.com/noojee/lint_hard.git
 environment:
   sdk: '>=3.7.0 <4.0.0'
 dependencies:
-  analyzer:
-  analyzer_plugin:
-  custom_lint_builder:
+  analyzer: ^7.6.0
+  analyzer_plugin: ^0.13.4
+  custom_lint_builder: ^0.8.0
 
