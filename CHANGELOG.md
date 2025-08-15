@@ -1,3 +1,6 @@
+# 6.2.1
+- disabled type_annotate_public_apis as it is incompatible wiht omit_obvious_property_types which I consider the more important lint for most users.
+If you are a package maintainer you should re-enable type_annotate_public_apis for your public api's.
 # 6.2.0
 - added custom lint 'fields_first_constructors_next' which places
  fields before constructors so that the state of a class is 

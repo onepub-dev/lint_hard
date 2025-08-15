@@ -181,7 +181,7 @@ linter:
     test_types_in_equals : true
     throw_in_finally : true
     tighten_type_of_initializing_formals : true
-    type_annotate_public_apis : true
+    type_annotate_public_apis : false
     type_init_formals : true
     type_literal_in_constant_pattern : true
     unawaited_futures : true
