@@ -10,3 +10,4 @@ pubspec.lock
 doc/api/
 .history
 .failed_tracker
+logs
