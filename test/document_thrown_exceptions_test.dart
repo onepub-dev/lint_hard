@@ -17,46 +17,66 @@ void main() {
 
   test('detects undocumented thrown types in methods', () {
     final method = _method(unit, 'undocumentedMethod');
-    final missing =
-        missingThrownTypeDocs(method.body, method.documentationComment);
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
 
     expect(missing, equals({'BadStateException'}));
   });
 
   test('accepts documented thrown types in methods', () {
     final method = _method(unit, 'documentedMethod');
-    final missing =
-        missingThrownTypeDocs(method.body, method.documentationComment);
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
 
     expect(missing, isEmpty);
   });
 
   test('detects undocumented thrown types in constructors', () {
     final ctor = _constructor(unit, className: 'Sample');
-    final missing = missingThrownTypeDocs(ctor.body, ctor.documentationComment);
+    final missing = missingThrownTypeDocs(
+      ctor.body,
+      ctor.documentationComment,
+      allowSourceFallback: true,
+    );
 
     expect(missing, equals({'BadStateException'}));
   });
 
   test('accepts documented thrown types in named constructors', () {
     final ctor = _constructor(unit, className: 'Sample', name: 'named');
-    final missing = missingThrownTypeDocs(ctor.body, ctor.documentationComment);
+    final missing = missingThrownTypeDocs(
+      ctor.body,
+      ctor.documentationComment,
+      allowSourceFallback: true,
+    );
 
     expect(missing, isEmpty);
   });
 
   test('detects undocumented thrown types in top-level functions', () {
     final fn = _function(unit, 'undocumentedTopLevel');
-    final missing =
-        missingThrownTypeDocs(fn.functionExpression.body, fn.documentationComment);
+    final missing = missingThrownTypeDocs(
+      fn.functionExpression.body,
+      fn.documentationComment,
+      allowSourceFallback: true,
+    );
 
     expect(missing, equals({'BadStateException'}));
   });
 
   test('accepts documented thrown types in top-level functions', () {
     final fn = _function(unit, 'documentedTopLevel');
-    final missing =
-        missingThrownTypeDocs(fn.functionExpression.body, fn.documentationComment);
+    final missing = missingThrownTypeDocs(
+      fn.functionExpression.body,
+      fn.documentationComment,
+      allowSourceFallback: true,
+    );
 
     expect(missing, isEmpty);
   });

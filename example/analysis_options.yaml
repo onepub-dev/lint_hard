@@ -11,4 +11,4 @@ plugins:
     path: ..
     diagnostics:
       document_thrown_exceptions: true
-      # fields_first_constructors_next: true
+      fields_first_constructors_next: true

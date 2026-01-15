@@ -78,6 +78,7 @@ class _Visitor extends SimpleAstVisitor<void> {
     required Token reportToken,
   }) {
     if (body is EmptyFunctionBody) return;
+    if (!_containsThrowToken(body)) return;
 
     final missing = missingThrownTypeDocs(body, documentationComment);
     if (missing.isEmpty) return;
@@ -89,18 +90,19 @@ class _Visitor extends SimpleAstVisitor<void> {
 Set<String> _collectThrownTypes(FunctionBody body) {
   final collector = _ThrowTypeCollector();
   body.accept(collector);
-  if (collector.thrownTypes.isNotEmpty) return collector.thrownTypes;
-
-  final fallback = _collectThrownTypesFromSource(body.toSource());
-  collector.thrownTypes.addAll(fallback);
   return collector.thrownTypes;
 }
 
 Set<String> missingThrownTypeDocs(
   FunctionBody body,
-  Comment? documentationComment,
+  Comment? documentationComment, {
+  bool allowSourceFallback = false,
+}
 ) {
   final thrownTypes = _collectThrownTypes(body);
+  if (thrownTypes.isEmpty && allowSourceFallback) {
+    thrownTypes.addAll(_collectThrownTypesFromSource(body.toSource()));
+  }
   if (thrownTypes.isEmpty) return <String>{};
 
   final docText =
@@ -118,8 +120,8 @@ String _docText(Comment comment) {
 }
 
 Set<String> _collectThrownTypesFromSource(String source) {
-  final matches = RegExp(r'\bthrow\s+([A-Z][A-Za-z0-9_]*)')
-      .allMatches(source);
+  final matches =
+      RegExp(r'\bthrow\s+([A-Z][A-Za-z0-9_]*)').allMatches(source);
   final types = <String>{};
   for (final match in matches) {
     final name = match.group(1);
@@ -177,4 +179,15 @@ String? _normalizeTypeName(String rawName) {
 
   if (name == 'dynamic' || name == 'Object' || name == 'Never') return null;
   return name;
+}
+
+bool _containsThrowToken(FunctionBody body) {
+  var token = body.beginToken;
+  final end = body.endToken;
+  while (true) {
+    if (token.keyword == Keyword.THROW) return true;
+    if (identical(token, end)) break;
+    token = token.next!;
+  }
+  return false;
 }
