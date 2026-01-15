@@ -6,8 +6,7 @@ analyzer:
     strict-inference: true
     strict-raw-types: true
   plugins:
-    - custom_lint
-
+    - lint_hard
 linter:
   rules:
     always_declare_return_types : true
@@ -238,8 +237,3 @@ linter:
     use_truncating_division : true
     valid_regexps : true
     void_checks : true
-
-
-custom_lint:
-  rules:
-    fields_first_constructors_next: true

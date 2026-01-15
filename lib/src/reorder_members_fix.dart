@@ -1,119 +1,91 @@
+import 'package:analysis_server_plugin/edit/dart/correction_producer.dart';
+import 'package:analysis_server_plugin/edit/dart/dart_fix_kind_priority.dart';
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/error/error.dart';
 import 'package:analyzer/source/source_range.dart';
-import 'package:custom_lint_builder/custom_lint_builder.dart';
+import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
+import 'package:analyzer_plugin/utilities/fixes/fixes.dart';
 
-class ReorderMembersFix extends DartFix {
-  ReorderMembersFix();
+import 'sort_fields_then_constructors.dart';
+
+class ReorderMembersFix extends ResolvedCorrectionProducer {
+  static const FixKind _fixKind = FixKind(
+    'lint_hard.fix.reorder_members',
+    DartFixKindPriority.standard,
+    'Reorder members: fields → constructors → others',
+  );
+
+  ReorderMembersFix({required super.context});
 
   @override
-  Future<void> run(
-    CustomLintResolver resolver,
-    ChangeReporter reporter,
-    CustomLintContext context,
-    AnalysisError analysisError,
-    List<AnalysisError> others,
-  ) async {
-    final unit = await resolver.getResolvedUnitResult();
-    final content = unit.content;
+  CorrectionApplicability get applicability =>
+      CorrectionApplicability.acrossSingleFile;
 
-    // Only decide to show the fix if the primary error really needs changes.
-    final type = _containingType(unit.unit, analysisError.offset);
-    late final List<ClassMember> members;
-    switch (type) {
-      case ClassDeclaration d:
-        members = d.members;
-      case MixinDeclaration d:
-        members = d.members;
-      default:
-        return; // skip enums/others
+  @override
+  FixKind get fixKind => _fixKind;
+
+  @override
+  Future<void> compute(ChangeBuilder builder) async {
+    if (diagnostic?.diagnosticCode != FieldsFirstConstructorsNext.code) return;
+
+    final decl = _containingType(node);
+    if (decl == null) return;
+
+    final members = decl.members;
+    if (members.isEmpty || _alreadyOrdered(members)) return;
+
+    final content = unitResult.content;
+    final nl = content.contains('\r\n') ? '\r\n' : '\n';
+
+    final fields = <ClassMember>[];
+    final ctors = <ClassMember>[];
+    final othersM = <ClassMember>[];
+
+    for (final m in members) {
+      if (m is FieldDeclaration) {
+        fields.add(m);
+      } else if (m is ConstructorDeclaration) {
+        ctors.add(m);
+      } else {
+        othersM.add(m);
+      }
     }
-    final decl = type!;
 
-    if (members.isEmpty) return;
-    if (_alreadyOrdered(members)) return;
+    // Each slice includes leading comments & original indentation.
+    String slice(ClassMember m) {
+      final start = _memberSliceStart(content, m);
+      return content.substring(start, m.end);
+    }
 
-    final changeBuilder = reporter.createChangeBuilder(
-      message: 'Reorder members: fields → constructors → others',
-      priority: 1,
+    String joinGroup(List<ClassMember> group) =>
+        group.map(slice).join('$nl$nl');
+
+    final parts = <String>[];
+    void addGroup(List<ClassMember> g) {
+      if (g.isEmpty) return;
+      if (parts.isNotEmpty) parts.add('$nl$nl');
+      parts.add(joinGroup(g));
+    }
+
+    addGroup(fields);
+    addGroup(ctors);
+    addGroup(othersM);
+
+    final newBlock = parts.join();
+
+    // Replace from the beginning of the first member's line to the end of the last member.
+    final firstStartLine = _lineStart(
+      content,
+      _memberSliceStart(content, members.first),
     );
+    final end = members.last.end;
 
-    changeBuilder.addDartFileEdit((builder) {
-      // We’ll fix all affected types in this file (primary + others), but dedupe.
-      final handledDecls = <int>{};
-
-      Future<void> applyTo(AstNode d) async {
-        if (!handledDecls.add(d.offset)) return;
-
-        final mems =
-            d is ClassDeclaration ? d.members : (d as MixinDeclaration).members;
-        if (mems.isEmpty || _alreadyOrdered(mems)) return;
-
-        final fields = <ClassMember>[];
-        final ctors = <ClassMember>[];
-        final othersM = <ClassMember>[];
-
-        for (final m in mems) {
-          if (m is FieldDeclaration) {
-            fields.add(m);
-          } else if (m is ConstructorDeclaration) {
-            ctors.add(m);
-          } else {
-            othersM.add(m);
-          }
-        }
-
-        final nl = content.contains('\r\n') ? '\r\n' : '\n';
-
-        // IMPORTANT: each slice includes leading comments & original indentation
-        String slice(ClassMember m) {
-          final start = _memberSliceStart(content, m);
-          return content.substring(start, m.end);
-        }
-
-        String joinGroup(List<ClassMember> group) =>
-            group.map(slice).join('$nl$nl');
-
-        final parts = <String>[];
-        void addGroup(List<ClassMember> g) {
-          if (g.isEmpty) return;
-          if (parts.isNotEmpty) parts.add('$nl$nl');
-          parts.add(joinGroup(g));
-        }
-
-        addGroup(fields);
-        addGroup(ctors);
-        addGroup(othersM);
-
-        final newBlock = parts.join();
-
-        // Replace from the beginning of the first member's line to the end of the last member.
-        final firstStartLine = _lineStart(
-          content,
-          _memberSliceStart(content, mems.first),
-        );
-        final end = mems.last.end;
-
-        builder.addSimpleReplacement(
-          SourceRange(firstStartLine, end - firstStartLine),
-          newBlock,
-        );
-      }
-
-      // Primary declaration
-      applyTo(decl);
-
-      // Fix-all in file for same-code diagnostics
-      for (final err in others) {
-        final d = _containingType(unit.unit, err.offset);
-        if (d is ClassDeclaration || d is MixinDeclaration) {
-          applyTo(d!);
-        }
-      }
+    await builder.addDartFileEdit(file, (builder) {
+      builder.addSimpleReplacement(
+        SourceRange(firstStartLine, end - firstStartLine),
+        newBlock,
+      );
     });
   }
-
-  // ---- helpers ----
 
   bool _alreadyOrdered(List<ClassMember> members) {
     final fields = <ClassMember>[];
@@ -127,8 +99,9 @@ class ReorderMembersFix extends DartFix {
       else
         others.add(m);
     }
-    if (members.length != fields.length + ctors.length + others.length)
+    if (members.length != fields.length + ctors.length + others.length) {
       return false;
+    }
     var i = 0;
     for (final m in fields) {
       if (!identical(members[i++], m)) return false;
@@ -142,27 +115,17 @@ class ReorderMembersFix extends DartFix {
     return true;
   }
 
-  /// Start of the class/mixin/enum containing [offset], or null.
-  AstNode? _containingType(CompilationUnit unit, int offset) {
-    for (final d in unit.declarations) {
-      if (d is ClassDeclaration ||
-          d is MixinDeclaration ||
-          d is EnumDeclaration) {
-        if (d.offset <= offset && offset < d.end) return d;
-      }
-    }
+  _ClassOrMixinDecl? _containingType(AstNode node) {
+    final decl = node.thisOrAncestorOfType<ClassDeclaration>();
+    if (decl != null) return _ClassOrMixinDecl.classDecl(decl);
+    final mixinDecl = node.thisOrAncestorOfType<MixinDeclaration>();
+    if (mixinDecl != null) return _ClassOrMixinDecl.mixinDecl(mixinDecl);
     return null;
   }
 
-  /// Returns the **line start** of the member slice, including:
-  /// - doc comments (`///` or `/** ... */`)
-  /// - annotations (`@deprecated`, etc.)
-  /// - any contiguous `//` lines or `/* ... */` block immediately above
-  ///   (but stops at the first blank line).
   int _memberSliceStart(String content, ClassMember m) {
     var earliest = m.offset;
 
-    // Include doc comments / metadata when present
     final doc = m.documentationComment;
     if (doc != null) earliest = doc.offset < earliest ? doc.offset : earliest;
     final md = m.metadata;
@@ -171,10 +134,7 @@ class ReorderMembersFix extends DartFix {
       if (mdStart < earliest) earliest = mdStart;
     }
 
-    // Start from the beginning of that line
     var top = _lineStart(content, earliest);
-
-    // Now walk upwards over immediate comment(s), stopping on first blank line
     var cursor = top;
     var inBlock = false;
 
@@ -183,39 +143,33 @@ class ReorderMembersFix extends DartFix {
       final prevStart = _lineStart(content, cursor - 1);
       final line = content.substring(prevStart, cursor);
 
-      // If the previous line is blank, stop (do not include the blank line)
       if (line.trim().isEmpty) break;
 
       final text = line.trimLeft();
 
       if (!inBlock) {
         if (text.startsWith('//')) {
-          cursor = prevStart; // include the line
+          cursor = prevStart;
           continue;
         }
         if (text.endsWith('*/')) {
           inBlock = true;
-          cursor = prevStart; // include the '*/' line
+          cursor = prevStart;
           continue;
         }
-        // Not a comment line: stop
         break;
       } else {
-        // We are inside a /* ... */ block, include lines until we hit '/*'
         cursor = prevStart;
         if (text.startsWith('/*')) {
           inBlock = false;
           continue;
         }
-        // keep going up
       }
     }
 
-    // Slice begins at the first included comment/annotation/decl line **start**
     return cursor;
   }
 
-  /// Start-of-line index for [offset]
   int _lineStart(String content, int offset) {
     var i = offset - 1;
     while (i >= 0) {
@@ -230,4 +184,19 @@ class ReorderMembersFix extends DartFix {
     }
     return 0;
   }
+}
+
+class _ClassOrMixinDecl {
+  final ClassDeclaration? classDecl;
+  final MixinDeclaration? mixinDecl;
+
+  const _ClassOrMixinDecl._(this.classDecl, this.mixinDecl);
+
+  factory _ClassOrMixinDecl.classDecl(ClassDeclaration decl) =>
+      _ClassOrMixinDecl._(decl, null);
+  factory _ClassOrMixinDecl.mixinDecl(MixinDeclaration decl) =>
+      _ClassOrMixinDecl._(null, decl);
+
+  List<ClassMember> get members =>
+      classDecl != null ? classDecl!.members : mixinDecl!.members;
 }
