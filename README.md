@@ -31,65 +31,9 @@ analyzer:
 
 You can see the full set of lints in the analysis_options.yaml file.
 
-## other improvements
-
-The Lint Hard project also offers the following advice to help you improve the overall quality of your project.
-
-Or you can just jump to the bottom of this page to [install](#installing-lint-hard) Lint Hard.
-
-## dart format
-We strongly recommend that you use `dart format` to format your code.  Whilst personally I don't like some of the formatting decisions imposed by dart format, consistency is more important.  Don't fight this one. Just run `dart format` with no options. You will get used to the format and it makes sharing code with other developers easier. 
-Using `dart format` will also make it easier for you to read other developer's code as `dart format` is almost universally used in the Dart community.
-
-dart format will improve your commit history as it won't be fouled with format differences. This is particularly important  in a team project but will render dividends even if you work alone. 
-
-Use an IDE like vs-code that automatically formats your code each time you save it.
-
-**_Only commit code that has been formatted._**
-
-
-## a word to JavaScript developers
-If you are coming from the JavaScript world, enforcing type declarations may initially feel burdensome but you will quickly see that it allows you to develop faster and release quality code sooner.   
-
-## avoid dynamic and Object types
-
-For the most part you should never use the dynamic type and rarely use the Object type.
-
-There are exceptions to these rules such as when parsing json dart. But you should always try to use an actual type. dynamic and Object should be last resorts.
-
-## Adjustments for package developers
-
-If you are building a dart package then you should be adding documentation to all of your public methods as well as ensuring that all public apis have type information.
-
-To ensure you do this consistently add the following to you analysis_options.yaml:
-
-```yaml
-linter:
-  rules:
-    public_member_api_docs : true 
-    type_annotate_public_apis: true
-```
-
-Adding the annotation type_annotate_public_apis will cause a warning
-
-## Use nnbd
-
-This one probably doesn't need to be said, but just in case...
-
-If you haven't already moved your project to Not Null by Default (nnbd) now is the time to do it.
-We do recommend applying Lint Hard to your project first and then doing the nnbd conversion. A cleaner code base will help the nnbd migration tool.
-
-Now you have nnbd enabled, try to minimize the use of '?' operator. Use non-nullable types as your default. Only use a nullable type if the variable really needs to be nullable.
-
-Use techniques such as default values and (carefully) the `late` keyword.
-
-
 ## installing Lint Hard
 
 To install lint_hard into your app or package:
-
-Note: for analyzer 9+, plugin configuration uses the top-level `plugins` key
-(not `analyzer.plugins`). This allows enabling plugin diagnostics.
 
 1. Check in any existing code changes.
 
@@ -151,6 +95,60 @@ Note: for analyzer 9+, plugin configuration uses the top-level `plugins` key
       rules:
         avoid_print: false  
     ```
+
+## other improvements
+
+The Lint Hard project also offers the following advice to help you improve the overall quality of your project.
+
+Or you can just jump to the bottom of this page to [install](#installing-lint-hard) Lint Hard.
+
+## dart format
+We strongly recommend that you use `dart format` to format your code.  Whilst personally I don't like some of the formatting decisions imposed by dart format, consistency is more important.  Don't fight this one. Just run `dart format` with no options. You will get used to the format and it makes sharing code with other developers easier. 
+Using `dart format` will also make it easier for you to read other developer's code as `dart format` is almost universally used in the Dart community.
+
+dart format will improve your commit history as it won't be fouled with format differences. This is particularly important  in a team project but will render dividends even if you work alone. 
+
+Use an IDE like vs-code that automatically formats your code each time you save it.
+
+**_Only commit code that has been formatted._**
+
+
+## a word to JavaScript developers
+If you are coming from the JavaScript world, enforcing type declarations may initially feel burdensome but you will quickly see that it allows you to develop faster and release quality code sooner.   
+
+## avoid dynamic and Object types
+
+For the most part you should never use the dynamic type and rarely use the Object type.
+
+There are exceptions to these rules such as when parsing json dart. But you should always try to use an actual type. dynamic and Object should be last resorts.
+
+## Adjustments for package developers
+
+If you are building a dart package then you should be adding documentation to all of your public methods as well as ensuring that all public apis have type information.
+
+To ensure you do this consistently add the following to you analysis_options.yaml:
+
+```yaml
+linter:
+  rules:
+    public_member_api_docs : true 
+    type_annotate_public_apis: true
+```
+
+Adding the annotation type_annotate_public_apis will cause a warning
+
+## Use nnbd
+
+This one probably doesn't need to be said, but just in case...
+
+If you haven't already moved your project to Not Null by Default (nnbd) now is the time to do it.
+We do recommend applying Lint Hard to your project first and then doing the nnbd conversion. A cleaner code base will help the nnbd migration tool.
+
+Now you have nnbd enabled, try to minimize the use of '?' operator. Use non-nullable types as your default. Only use a nullable type if the variable really needs to be nullable.
+
+Use techniques such as default values and (carefully) the `late` keyword.
+
+
 
 
 ## customizing the predefined lint sets

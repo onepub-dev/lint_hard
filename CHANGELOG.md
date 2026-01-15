@@ -1,3 +1,10 @@
+# 7.0.1
+- re-ordered the readme so that the install instructions are closer to the top.
+
+- UPGRADE: if upgrading from lint_hard 6.x you will need to include a plugin 
+declaration in your analysis_options.yaml file to activate the custom lints in
+lint_hard.  See the README.md for details.
+
 # 7.0.0
 - implemented new lint: document_thrown_exceptions that warns when a method has not documented a throws clause.
 - migrated the code away from custom_lint to the analyzer v9 package.
