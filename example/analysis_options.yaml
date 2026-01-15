@@ -5,3 +5,10 @@
 
 
 include: package:lint_hard/all.yaml
+
+plugins:
+  lint_hard:
+    path: ..
+    diagnostics:
+      document_thrown_exceptions: true
+      # fields_first_constructors_next: true

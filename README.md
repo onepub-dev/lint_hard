@@ -88,6 +88,9 @@ Use techniques such as default values and (carefully) the `late` keyword.
 
 To install lint_hard into your app or package:
 
+Note: for analyzer 9+, plugin configuration uses the top-level `plugins` key
+(not `analyzer.plugins`). This allows enabling plugin diagnostics.
+
 1. Check in any existing code changes.
 
 2. run dart format
