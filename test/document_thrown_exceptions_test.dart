@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:analysis_server_plugin/edit/dart/correction_producer.dart';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
-import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/diagnostic/diagnostic.dart';
@@ -16,11 +15,18 @@ import 'package:test/test.dart';
 
 void main() {
   late CompilationUnit unit;
+  late ResolvedUnitResult resolvedUnit;
+  late ResolvedLibraryResult resolvedLibrary;
+  late String fixturePath;
+  late String fixtureFilePath;
 
-  setUpAll(() {
-    final content =
-        File('test/fixtures/document_thrown_exceptions.dart').readAsStringSync();
-    unit = parseString(content: content).unit;
+  setUpAll(() async {
+    fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
+    fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await _resolveFixture(fixtureFilePath);
+    resolvedUnit = resolved.unit;
+    resolvedLibrary = resolved.library;
+    unit = resolvedUnit.unit;
   });
 
   test('detects undocumented thrown types in methods', () {
@@ -178,11 +184,6 @@ void main() {
   });
 
   test('fix inserts throws docs for rethrown exceptions', () async {
-    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
-    final filePath = File(fixturePath).absolute.path;
-    final resolved = await _resolveFixture(filePath);
-    final resolvedUnit = resolved.unit;
-    final resolvedLibrary = resolved.library;
     final method = _method(resolvedUnit.unit, 'throwCaughtWithRethrow');
 
     final diagnostic = Diagnostic.forValues(
@@ -207,7 +208,7 @@ void main() {
 
     final edits = builder.sourceChange.edits;
     expect(edits, isNotEmpty);
-    final fileEdit = edits.firstWhere((edit) => edit.file == filePath);
+    final fileEdit = edits.firstWhere((edit) => edit.file == fixtureFilePath);
     final updated =
         SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
     expect(
@@ -217,11 +218,6 @@ void main() {
   });
 
   test('fix inserts throws docs for multiple exceptions', () async {
-    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
-    final filePath = File(fixturePath).absolute.path;
-    final resolved = await _resolveFixture(filePath);
-    final resolvedUnit = resolved.unit;
-    final resolvedLibrary = resolved.library;
     final method = _method(resolvedUnit.unit, 'undocumentedMultipleThrows');
 
     final diagnostic = Diagnostic.forValues(
@@ -246,7 +242,7 @@ void main() {
 
     final edits = builder.sourceChange.edits;
     expect(edits, isNotEmpty);
-    final fileEdit = edits.firstWhere((edit) => edit.file == filePath);
+    final fileEdit = edits.firstWhere((edit) => edit.file == fixtureFilePath);
     final updated =
         SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
     expect(
@@ -258,11 +254,6 @@ void main() {
   });
 
   test('fix documents repeated thrown types once', () async {
-    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
-    final filePath = File(fixturePath).absolute.path;
-    final resolved = await _resolveFixture(filePath);
-    final resolvedUnit = resolved.unit;
-    final resolvedLibrary = resolved.library;
     final method = _method(resolvedUnit.unit, 'duplicatedThrows');
 
     final diagnostic = Diagnostic.forValues(
@@ -287,7 +278,7 @@ void main() {
 
     final edits = builder.sourceChange.edits;
     expect(edits, isNotEmpty);
-    final fileEdit = edits.firstWhere((edit) => edit.file == filePath);
+    final fileEdit = edits.firstWhere((edit) => edit.file == fixtureFilePath);
     final updated =
         SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
     final match =

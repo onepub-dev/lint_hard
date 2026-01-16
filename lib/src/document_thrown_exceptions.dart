@@ -235,9 +235,6 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
     node.body.accept(bodyCollector);
 
     for (final info in bodyCollector._thrown) {
-      if (_tryCatchesTypeWithoutRethrow(info.name, node)) {
-        continue;
-      }
       if (!_isCaughtWithoutRethrow(info, node.catchClauses)) {
         _recordThrow(info);
       }
@@ -255,20 +252,6 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
       clause.body.accept(this);
     }
     node.finallyBlock?.accept(this);
-  }
-
-  bool _tryCatchesTypeWithoutRethrow(String typeName, TryStatement node) {
-    final tryText = node.toSource();
-    final onPattern =
-        RegExp(r'\bon\s+' + RegExp.escape(typeName) + r'\b');
-    if (!onPattern.hasMatch(tryText)) return false;
-    for (final clause in node.catchClauses) {
-      if (clause.toSource().contains('on $typeName')) {
-        if (_catchRethrows(clause)) return false;
-        return true;
-      }
-    }
-    return true;
   }
 
   void _recordThrow(_ThrownTypeInfo info) {
@@ -292,31 +275,16 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
     final exceptionType = clause.exceptionType;
     if (exceptionType == null) return true;
 
-    final clauseText = clause.toSource();
-    final onMatch =
-        RegExp(r'\bon\s+' + RegExp.escape(info.name) + r'\b')
-            .hasMatch(clauseText);
-    if (onMatch) return true;
-    if (exceptionType.toSource().contains(info.name)) return true;
-
     final catchType = exceptionType.type;
     if (catchType != null && info.type != null) {
       if (_isSubtypeOf(info.type!, catchType)) return true;
     }
 
-    var catchName = _catchTypeName(exceptionType);
-    if (catchName == null) {
-      catchName = _catchTypeNameFromClause(clause);
-    }
-    if (catchName == null) {
-      if (clauseText.contains('on') && clauseText.contains(info.name)) {
-        return true;
-      }
-      return false;
-    }
+    final catchName = _catchTypeName(exceptionType);
+    if (catchName == null) return false;
     if (_isCatchAllName(catchName, info.name)) return true;
     if (catchName == info.name) return true;
-    return exceptionType.toSource().contains(info.name);
+    return false;
   }
 
   bool _isSubtypeOf(DartType thrownType, DartType catchType) {
@@ -423,13 +391,6 @@ String? _catchTypeName(TypeAnnotation exceptionType) {
     return _normalizeCatchTypeName(exceptionType.name.lexeme);
   }
   return _normalizeCatchTypeName(exceptionType.toSource());
-}
-
-String? _catchTypeNameFromClause(CatchClause clause) {
-  final match = RegExp(r'\bon\s+([A-Za-z_][A-Za-z0-9_\.]*)')
-      .firstMatch(clause.toSource());
-  if (match == null) return null;
-  return _normalizeCatchTypeName(match.group(1) ?? '');
 }
 
 bool _isCatchAllName(String catchName, String thrownName) {
