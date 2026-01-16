@@ -1,9 +1,17 @@
 import 'dart:io';
 
+import 'package:analysis_server_plugin/edit/dart/correction_producer.dart';
+import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
+import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/diagnostic/diagnostic.dart';
+import 'package:analyzer/file_system/physical_file_system.dart';
+import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
+import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:lint_hard/src/document_thrown_exceptions.dart';
+import 'package:lint_hard/src/document_thrown_exceptions_fix.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -101,6 +109,190 @@ void main() {
     );
 
     expect(missing, isEmpty);
+  });
+
+  test('ignores throws caught without rethrow', () {
+    final method = _method(unit, 'throwCaughtWithoutOn');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('ignores throws caught with on clause', () {
+    final method = _method(unit, 'throwCaughtWithOn');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('ignores throws caught with specific on clause', () {
+    final method = _method(unit, 'throwCaughtWithSameOn');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('reports throws that are rethrown in catch', () {
+    final method = _method(unit, 'throwCaughtWithRethrow');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, equals({'BadStateException'}));
+  });
+
+  test('detects multiple undocumented thrown types', () {
+    final method = _method(unit, 'undocumentedMultipleThrows');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, equals({'BadStateException', 'MissingFileException'}));
+  });
+
+  test('dedupes repeated thrown types', () {
+    final method = _method(unit, 'duplicatedThrows');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, equals({'BadStateException'}));
+  });
+
+  test('fix inserts throws docs for rethrown exceptions', () async {
+    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
+    final filePath = File(fixturePath).absolute.path;
+    final resolved = await _resolveFixture(filePath);
+    final resolvedUnit = resolved.unit;
+    final resolvedLibrary = resolved.library;
+    final method = _method(resolvedUnit.unit, 'throwCaughtWithRethrow');
+
+    final diagnostic = Diagnostic.forValues(
+      source: resolvedUnit.libraryFragment.source,
+      offset: method.name.offset,
+      length: method.name.length,
+      diagnosticCode: DocumentThrownExceptions.code,
+      message: DocumentThrownExceptions.code.problemMessage,
+      correctionMessage: DocumentThrownExceptions.code.correctionMessage,
+    );
+
+    final producerContext = CorrectionProducerContext.createResolved(
+      libraryResult: resolvedLibrary,
+      unitResult: resolvedUnit,
+      diagnostic: diagnostic,
+      selectionOffset: method.name.offset,
+      selectionLength: method.name.length,
+    );
+    final fix = DocumentThrownExceptionsFix(context: producerContext);
+    final builder = ChangeBuilder(session: resolvedUnit.session);
+    await fix.compute(builder);
+
+    final edits = builder.sourceChange.edits;
+    expect(edits, isNotEmpty);
+    final fileEdit = edits.firstWhere((edit) => edit.file == filePath);
+    final updated =
+        SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
+    expect(
+      updated,
+      contains('/// Throws [BadStateException].\n  void throwCaughtWithRethrow('),
+    );
+  });
+
+  test('fix inserts throws docs for multiple exceptions', () async {
+    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
+    final filePath = File(fixturePath).absolute.path;
+    final resolved = await _resolveFixture(filePath);
+    final resolvedUnit = resolved.unit;
+    final resolvedLibrary = resolved.library;
+    final method = _method(resolvedUnit.unit, 'undocumentedMultipleThrows');
+
+    final diagnostic = Diagnostic.forValues(
+      source: resolvedUnit.libraryFragment.source,
+      offset: method.name.offset,
+      length: method.name.length,
+      diagnosticCode: DocumentThrownExceptions.code,
+      message: DocumentThrownExceptions.code.problemMessage,
+      correctionMessage: DocumentThrownExceptions.code.correctionMessage,
+    );
+
+    final producerContext = CorrectionProducerContext.createResolved(
+      libraryResult: resolvedLibrary,
+      unitResult: resolvedUnit,
+      diagnostic: diagnostic,
+      selectionOffset: method.name.offset,
+      selectionLength: method.name.length,
+    );
+    final fix = DocumentThrownExceptionsFix(context: producerContext);
+    final builder = ChangeBuilder(session: resolvedUnit.session);
+    await fix.compute(builder);
+
+    final edits = builder.sourceChange.edits;
+    expect(edits, isNotEmpty);
+    final fileEdit = edits.firstWhere((edit) => edit.file == filePath);
+    final updated =
+        SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
+    expect(
+      updated,
+      contains('/// Throws [BadStateException].\n'
+          '  /// Throws [MissingFileException].\n'
+          '  void undocumentedMultipleThrows('),
+    );
+  });
+
+  test('fix documents repeated thrown types once', () async {
+    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
+    final filePath = File(fixturePath).absolute.path;
+    final resolved = await _resolveFixture(filePath);
+    final resolvedUnit = resolved.unit;
+    final resolvedLibrary = resolved.library;
+    final method = _method(resolvedUnit.unit, 'duplicatedThrows');
+
+    final diagnostic = Diagnostic.forValues(
+      source: resolvedUnit.libraryFragment.source,
+      offset: method.name.offset,
+      length: method.name.length,
+      diagnosticCode: DocumentThrownExceptions.code,
+      message: DocumentThrownExceptions.code.problemMessage,
+      correctionMessage: DocumentThrownExceptions.code.correctionMessage,
+    );
+
+    final producerContext = CorrectionProducerContext.createResolved(
+      libraryResult: resolvedLibrary,
+      unitResult: resolvedUnit,
+      diagnostic: diagnostic,
+      selectionOffset: method.name.offset,
+      selectionLength: method.name.length,
+    );
+    final fix = DocumentThrownExceptionsFix(context: producerContext);
+    final builder = ChangeBuilder(session: resolvedUnit.session);
+    await fix.compute(builder);
+
+    final edits = builder.sourceChange.edits;
+    expect(edits, isNotEmpty);
+    final fileEdit = edits.firstWhere((edit) => edit.file == filePath);
+    final updated =
+        SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
+    final match =
+        RegExp(r'/// Throws \[BadStateException\]\.').allMatches(updated);
+    expect(match.length, equals(1));
   });
 
   test('detects undocumented thrown types in constructors', () {
@@ -232,4 +424,27 @@ class _FunctionFinder extends RecursiveAstVisitor<void> {
     }
     super.visitFunctionDeclaration(node);
   }
+}
+
+class _ResolvedFixture {
+  final ResolvedUnitResult unit;
+  final ResolvedLibraryResult library;
+
+  const _ResolvedFixture(this.unit, this.library);
+}
+
+Future<_ResolvedFixture> _resolveFixture(String filePath) async {
+  final collection = AnalysisContextCollection(
+    includedPaths: [filePath],
+    resourceProvider: PhysicalResourceProvider.INSTANCE,
+  );
+  final context = collection.contextFor(filePath);
+  final session = context.currentSession;
+  final unitResult = await session.getResolvedUnit(filePath);
+  final libraryResult = await session.getResolvedLibrary(filePath);
+  if (unitResult is! ResolvedUnitResult ||
+      libraryResult is! ResolvedLibraryResult) {
+    throw StateError('Failed to resolve fixture: $filePath');
+  }
+  return _ResolvedFixture(unitResult, libraryResult);
 }

@@ -55,6 +55,52 @@ class Sample {
     }
   }
 
+  void throwCaughtWithoutOn() {
+    try {
+      throw BadStateException();
+    } catch (e) {
+      e.toString();
+    }
+  }
+
+  void throwCaughtWithOn() {
+    try {
+      throw BadStateException();
+    } on Exception catch (e) {
+      e.toString();
+    }
+  }
+
+  void throwCaughtWithSameOn() {
+    try {
+      throw BadStateException();
+    } on BadStateException {
+      // handled
+    }
+  }
+
+  void throwCaughtWithRethrow() {
+    try {
+      throw BadStateException();
+    } on Exception {
+      rethrow;
+    }
+  }
+
+  void undocumentedMultipleThrows() {
+    if (DateTime.now().isUtc) {
+      throw BadStateException();
+    }
+    throw MissingFileException();
+  }
+
+  void duplicatedThrows() {
+    throw BadStateException();
+    if (DateTime.now().isUtc) {
+      throw BadStateException();
+    }
+  }
+
   /// Throws [BadStateException] when invalid.
   Sample.named() {
     throw BadStateException();

@@ -4,6 +4,7 @@ import 'package:analyzer/analysis_rule/rule_visitor_registry.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
 
 class DocumentThrownExceptions extends AnalysisRule {
@@ -17,12 +18,12 @@ class DocumentThrownExceptions extends AnalysisRule {
 
   // Configure the lint rule metadata.
   DocumentThrownExceptions()
-      : super(
-          name: code.name,
-          description:
-              'Require documentation of each exception class thrown by a '
-              'method.',
-        );
+    : super(
+        name: code.name,
+        description:
+            'Require documentation of each exception class thrown by a '
+            'method.',
+      );
 
   @override
   // Expose lint code for registration and fixes.
@@ -97,10 +98,26 @@ class _Visitor extends SimpleAstVisitor<void> {
 }
 
 // Collect thrown exception types via AST traversal.
-Set<String> _collectThrownTypes(FunctionBody body) {
+_ThrownTypeResults _collectThrownTypes(FunctionBody body) {
   final collector = _ThrowTypeCollector();
   body.accept(collector);
-  return collector.thrownTypes;
+  return _ThrownTypeResults(
+    collector.thrownTypes,
+    sawThrowExpression: collector.sawThrowExpression,
+    sawUnknownThrowExpression: collector.sawUnknownThrowExpression,
+  );
+}
+
+class _ThrownTypeResults {
+  final Set<String> types;
+  final bool sawThrowExpression;
+  final bool sawUnknownThrowExpression;
+
+  const _ThrownTypeResults(
+    this.types, {
+    required this.sawThrowExpression,
+    required this.sawUnknownThrowExpression,
+  });
 }
 
 // Find thrown types missing from documentation.
@@ -108,11 +125,14 @@ Set<String> missingThrownTypeDocs(
   FunctionBody body,
   Comment? documentationComment, {
   bool allowSourceFallback = false,
-}
-) {
+}) {
   // Prefer AST; optionally fallback to source parsing for edge cases.
-  final thrownTypes = _collectThrownTypes(body);
-  if (thrownTypes.isEmpty && allowSourceFallback) {
+  final thrownResults = _collectThrownTypes(body);
+  final thrownTypes = thrownResults.types;
+  if (thrownTypes.isEmpty &&
+      allowSourceFallback &&
+      (thrownResults.sawUnknownThrowExpression ||
+          !thrownResults.sawThrowExpression)) {
     thrownTypes.addAll(_collectThrownTypesFromSource(body.toSource()));
   }
   if (thrownTypes.isEmpty) return <String>{};
@@ -134,8 +154,7 @@ String _docText(Comment comment) {
 
 // Extract thrown types from source text as a fallback.
 Set<String> _collectThrownTypesFromSource(String source) {
-  final matches =
-      RegExp(r'\bthrow\s+([A-Z][A-Za-z0-9_]*)').allMatches(source);
+  final matches = RegExp(r'\bthrow\s+([A-Z][A-Za-z0-9_]*)').allMatches(source);
   final types = <String>{};
   for (final match in matches) {
     final name = match.group(1);
@@ -179,32 +198,186 @@ String _normalizeDocType(String rawName) {
   return name.replaceAll(RegExp(r'\s+'), '').toLowerCase();
 }
 
+class _ThrownTypeInfo {
+  final String name;
+  final DartType? type;
+
+  const _ThrownTypeInfo(this.name, this.type);
+}
+
 class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
+  final List<_ThrownTypeInfo> _thrown = [];
   final Set<String> thrownTypes = <String>{};
+  bool sawThrowExpression = false;
+  int _unknownThrowCount = 0;
+
+  _ThrowTypeCollector();
+
+  bool get sawUnknownThrowExpression => _unknownThrowCount > 0;
 
   @override
   // Record exception types from throw expressions.
   void visitThrowExpression(ThrowExpression node) {
-    final typeName = _typeNameFromExpression(node.expression);
-    if (typeName != null) {
-      thrownTypes.add(typeName);
+    sawThrowExpression = true;
+    final info = _thrownTypeFromExpression(node.expression);
+    if (info != null) {
+      _recordThrow(info);
+    } else {
+      _unknownThrowCount++;
     }
     super.visitThrowExpression(node);
   }
+
+  @override
+  // Skip throws caught by a try/catch without rethrowing.
+  void visitTryStatement(TryStatement node) {
+    final bodyCollector = _ThrowTypeCollector();
+    node.body.accept(bodyCollector);
+
+    for (final info in bodyCollector._thrown) {
+      if (_tryCatchesTypeWithoutRethrow(info.name, node)) {
+        continue;
+      }
+      if (!_isCaughtWithoutRethrow(info, node.catchClauses)) {
+        _recordThrow(info);
+      }
+    }
+
+    if (bodyCollector.sawThrowExpression) {
+      sawThrowExpression = true;
+    }
+    if (bodyCollector._unknownThrowCount > 0 &&
+        !_catchesAllWithoutRethrow(node.catchClauses)) {
+      _unknownThrowCount += bodyCollector._unknownThrowCount;
+    }
+
+    for (final clause in node.catchClauses) {
+      clause.body.accept(this);
+    }
+    node.finallyBlock?.accept(this);
+  }
+
+  bool _tryCatchesTypeWithoutRethrow(String typeName, TryStatement node) {
+    final tryText = node.toSource();
+    final onPattern =
+        RegExp(r'\bon\s+' + RegExp.escape(typeName) + r'\b');
+    if (!onPattern.hasMatch(tryText)) return false;
+    for (final clause in node.catchClauses) {
+      if (clause.toSource().contains('on $typeName')) {
+        if (_catchRethrows(clause)) return false;
+        return true;
+      }
+    }
+    return true;
+  }
+
+  void _recordThrow(_ThrownTypeInfo info) {
+    _thrown.add(info);
+    thrownTypes.add(info.name);
+  }
+
+  bool _isCaughtWithoutRethrow(
+    _ThrownTypeInfo info,
+    NodeList<CatchClause> catchClauses,
+  ) {
+    for (final clause in catchClauses) {
+      if (_catchMatches(info, clause)) {
+        return !_catchRethrows(clause);
+      }
+    }
+    return false;
+  }
+
+  bool _catchMatches(_ThrownTypeInfo info, CatchClause clause) {
+    final exceptionType = clause.exceptionType;
+    if (exceptionType == null) return true;
+
+    final clauseText = clause.toSource();
+    final onMatch =
+        RegExp(r'\bon\s+' + RegExp.escape(info.name) + r'\b')
+            .hasMatch(clauseText);
+    if (onMatch) return true;
+    if (exceptionType.toSource().contains(info.name)) return true;
+
+    final catchType = exceptionType.type;
+    if (catchType != null && info.type != null) {
+      if (_isSubtypeOf(info.type!, catchType)) return true;
+    }
+
+    var catchName = _catchTypeName(exceptionType);
+    if (catchName == null) {
+      catchName = _catchTypeNameFromClause(clause);
+    }
+    if (catchName == null) {
+      if (clauseText.contains('on') && clauseText.contains(info.name)) {
+        return true;
+      }
+      return false;
+    }
+    if (_isCatchAllName(catchName, info.name)) return true;
+    if (catchName == info.name) return true;
+    return exceptionType.toSource().contains(info.name);
+  }
+
+  bool _isSubtypeOf(DartType thrownType, DartType catchType) {
+    if (thrownType is InterfaceType && catchType is InterfaceType) {
+      if (thrownType.element == catchType.element) return true;
+      for (final supertype in thrownType.allSupertypes) {
+        if (supertype.element == catchType.element) return true;
+      }
+    }
+    return false;
+  }
+
+  bool _catchRethrows(CatchClause clause) {
+    final finder = _RethrowFinder();
+    clause.body.accept(finder);
+    return finder.found;
+  }
+
+  bool _catchesAllWithoutRethrow(NodeList<CatchClause> catchClauses) {
+    for (final clause in catchClauses) {
+      if (_catchRethrows(clause)) continue;
+      final exceptionType = clause.exceptionType;
+      if (exceptionType == null) return true;
+      final catchName = _normalizeCatchTypeName(exceptionType.toSource());
+      if (catchName == null) continue;
+      if (catchName == 'Object' ||
+          catchName == 'dynamic' ||
+          catchName == 'Exception' ||
+          catchName == 'Error') {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
-// Normalize a thrown expression into a type name, if available.
-String? _typeNameFromExpression(Expression expression) {
+class _RethrowFinder extends RecursiveAstVisitor<void> {
+  bool found = false;
+
+  @override
+  void visitRethrowExpression(RethrowExpression node) {
+    found = true;
+  }
+}
+
+// Normalize a thrown expression into a type name and type, if available.
+_ThrownTypeInfo? _thrownTypeFromExpression(Expression expression) {
   if (expression is InstanceCreationExpression) {
     final typeName = expression.constructorName.type.name.lexeme;
-    return _normalizeTypeName(typeName);
+    final normalized = _normalizeTypeName(typeName);
+    if (normalized == null) return null;
+    return _ThrownTypeInfo(normalized, expression.staticType);
   }
 
   final staticType = expression.staticType;
   if (staticType == null) return null;
 
   final displayName = staticType.getDisplayString();
-  return _normalizeTypeName(displayName);
+  final normalized = _normalizeTypeName(displayName);
+  if (normalized == null) return null;
+  return _ThrownTypeInfo(normalized, staticType);
 }
 
 // Strip generics/qualifiers and drop non-specific types.
@@ -222,6 +395,48 @@ String? _normalizeTypeName(String rawName) {
 
   if (name == 'dynamic' || name == 'Object' || name == 'Never') return null;
   return name;
+}
+
+String? _normalizeCatchTypeName(String rawName) {
+  var name = rawName.trim();
+  if (name.isEmpty) return null;
+
+  name = name.split(RegExp(r'\s+')).first;
+
+  if (name.endsWith('?')) {
+    name = name.substring(0, name.length - 1);
+  }
+
+  final genericSplit = name.split('<');
+  name = genericSplit.first;
+
+  final dotIndex = name.lastIndexOf('.');
+  if (dotIndex != -1) {
+    name = name.substring(dotIndex + 1);
+  }
+
+  return name;
+}
+
+String? _catchTypeName(TypeAnnotation exceptionType) {
+  if (exceptionType is NamedType) {
+    return _normalizeCatchTypeName(exceptionType.name.lexeme);
+  }
+  return _normalizeCatchTypeName(exceptionType.toSource());
+}
+
+String? _catchTypeNameFromClause(CatchClause clause) {
+  final match = RegExp(r'\bon\s+([A-Za-z_][A-Za-z0-9_\.]*)')
+      .firstMatch(clause.toSource());
+  if (match == null) return null;
+  return _normalizeCatchTypeName(match.group(1) ?? '');
+}
+
+bool _isCatchAllName(String catchName, String thrownName) {
+  if (catchName == 'Object' || catchName == 'dynamic') return true;
+  if (catchName == 'Exception') return thrownName.endsWith('Exception');
+  if (catchName == 'Error') return thrownName.endsWith('Error');
+  return false;
 }
 
 // Scan tokens to quickly see if a throw exists at all.

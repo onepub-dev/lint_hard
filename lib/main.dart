@@ -16,12 +16,12 @@ class LintHardPlugin extends Plugin {
   @override
   // Register lint rules and their associated fixes.
   void register(PluginRegistry registry) {
-    registry.registerLintRule(DocumentThrownExceptions());
+    registry.registerWarningRule(DocumentThrownExceptions());
     registry.registerFixForRule(
       DocumentThrownExceptions.code,
       DocumentThrownExceptionsFix.new,
     );
-    registry.registerLintRule(FieldsFirstConstructorsNext());
+    registry.registerWarningRule(FieldsFirstConstructorsNext());
     registry.registerFixForRule(
       FieldsFirstConstructorsNext.code,
       ReorderMembersFix.new,

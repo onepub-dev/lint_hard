@@ -59,11 +59,11 @@ To install lint_hard into your app or package:
     include: package:lint_hard/all.yaml
     # enable lint hards custom lints - these do add a performance overhead.
     plugins:
-    lint_hard:
+      lint_hard:
         path: ..
         diagnostics:
-        document_thrown_exceptions: true
-        fields_first_constructors_next: true
+          document_thrown_exceptions: true
+          fields_first_constructors_next: true
     ```
 
 5. Remove your existing linter
