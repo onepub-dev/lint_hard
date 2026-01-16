@@ -13,6 +13,7 @@ class FieldsFirstConstructorsNext extends AnalysisRule {
         'Move fields to the top, constructors next, then methods/getters/etc.',
   );
 
+  // Configure the lint rule metadata.
   FieldsFirstConstructorsNext()
       : super(
           name: code.name,
@@ -21,9 +22,11 @@ class FieldsFirstConstructorsNext extends AnalysisRule {
         );
 
   @override
+  // Expose lint code for registration and fixes.
   LintCode get diagnosticCode => code;
 
   @override
+  // Register visitors that inspect class and mixin members.
   void registerNodeProcessors(
     RuleVisitorRegistry registry,
     RuleContext context,
@@ -38,9 +41,11 @@ class FieldsFirstConstructorsNext extends AnalysisRule {
 class _Visitor extends SimpleAstVisitor<void> {
   final AnalysisRule rule;
 
+  // Hold the rule to report diagnostics.
   _Visitor(this.rule);
 
   @override
+  // Report when a class has members in the wrong order.
   void visitClassDeclaration(ClassDeclaration node) {
     if (_needsReorder(node.members)) {
       rule.reportAtToken(node.name);
@@ -48,12 +53,14 @@ class _Visitor extends SimpleAstVisitor<void> {
   }
 
   @override
+  // Report when a mixin has members in the wrong order.
   void visitMixinDeclaration(MixinDeclaration node) {
     if (_needsReorder(node.members)) {
       rule.reportAtToken(node.name);
     }
   }
 
+  // Evaluate member order against the fields-then-ctors convention.
   bool _needsReorder(List<ClassMember> members) {
     if (members.isEmpty) return false;
 

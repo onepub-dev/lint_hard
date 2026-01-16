@@ -37,6 +37,72 @@ void main() {
     expect(missing, isEmpty);
   });
 
+  test('ignores thrown types mentioned in comments', () {
+    final method = _method(unit, 'commentThrowMethod');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('accepts multi-line throws clauses in docs', () {
+    final method = _method(unit, 'documentedMultiLineThrows');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('accepts "throws a" phrasing in docs', () {
+    final method = _method(unit, 'documentedThrowsWithArticle');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('accepts throws in the middle of a sentence', () {
+    final method = _method(unit, 'documentedThrowsMidSentence');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('accepts lists of thrown exceptions in docs', () {
+    final method = _method(unit, 'documentedThrowsList');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('accepts spaced exception names in doc lists', () {
+    final method = _method(unit, 'documentedThrowsListWithSpaces');
+    final missing = missingThrownTypeDocs(
+      method.body,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
   test('detects undocumented thrown types in constructors', () {
     final ctor = _constructor(unit, className: 'Sample');
     final missing = missingThrownTypeDocs(

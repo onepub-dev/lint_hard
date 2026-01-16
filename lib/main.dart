@@ -10,9 +10,11 @@ final plugin = LintHardPlugin();
 
 class LintHardPlugin extends Plugin {
   @override
+  // Plugin name used by the analysis server.
   String get name => 'lint_hard';
 
   @override
+  // Register lint rules and their associated fixes.
   void register(PluginRegistry registry) {
     registry.registerLintRule(DocumentThrownExceptions());
     registry.registerFixForRule(

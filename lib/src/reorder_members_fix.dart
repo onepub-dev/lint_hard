@@ -14,16 +14,20 @@ class ReorderMembersFix extends ResolvedCorrectionProducer {
     'Reorder members: fields → constructors → others',
   );
 
+  // Wire the fix into the analysis server context.
   ReorderMembersFix({required super.context});
 
   @override
+  // Apply within a single file without needing broader analysis.
   CorrectionApplicability get applicability =>
       CorrectionApplicability.acrossSingleFile;
 
   @override
+  // Expose the fix kind identifier for this lint.
   FixKind get fixKind => _fixKind;
 
   @override
+  // Reorder members into fields, constructors, then others.
   Future<void> compute(ChangeBuilder builder) async {
     if (diagnostic?.diagnosticCode != FieldsFirstConstructorsNext.code) return;
 
@@ -51,15 +55,18 @@ class ReorderMembersFix extends ResolvedCorrectionProducer {
     }
 
     // Each slice includes leading comments & original indentation.
+    // Preserve comments/metadata attached to a member.
     String slice(ClassMember m) {
       final start = _memberSliceStart(content, m);
       return content.substring(start, m.end);
     }
 
+    // Join members with a blank line between them.
     String joinGroup(List<ClassMember> group) =>
         group.map(slice).join('$nl$nl');
 
     final parts = <String>[];
+    // Append a group with spacing between groups.
     void addGroup(List<ClassMember> g) {
       if (g.isEmpty) return;
       if (parts.isNotEmpty) parts.add('$nl$nl');
@@ -87,6 +94,7 @@ class ReorderMembersFix extends ResolvedCorrectionProducer {
     });
   }
 
+  // Verify members are already ordered as fields, ctors, then others.
   bool _alreadyOrdered(List<ClassMember> members) {
     final fields = <ClassMember>[];
     final ctors = <ClassMember>[];
@@ -115,6 +123,7 @@ class ReorderMembersFix extends ResolvedCorrectionProducer {
     return true;
   }
 
+  // Find the nearest class or mixin for the current node.
   _ClassOrMixinDecl? _containingType(AstNode node) {
     final decl = node.thisOrAncestorOfType<ClassDeclaration>();
     if (decl != null) return _ClassOrMixinDecl.classDecl(decl);
@@ -123,6 +132,7 @@ class ReorderMembersFix extends ResolvedCorrectionProducer {
     return null;
   }
 
+  // Include leading doc/metadata/comment lines for a member slice.
   int _memberSliceStart(String content, ClassMember m) {
     var earliest = m.offset;
 
@@ -170,6 +180,7 @@ class ReorderMembersFix extends ResolvedCorrectionProducer {
     return cursor;
   }
 
+  // Locate the first character offset for the line containing offset.
   int _lineStart(String content, int offset) {
     var i = offset - 1;
     while (i >= 0) {
@@ -190,13 +201,17 @@ class _ClassOrMixinDecl {
   final ClassDeclaration? classDecl;
   final MixinDeclaration? mixinDecl;
 
+  // Represent either a class or mixin declaration.
   const _ClassOrMixinDecl._(this.classDecl, this.mixinDecl);
 
+  // Wrap a class declaration.
   factory _ClassOrMixinDecl.classDecl(ClassDeclaration decl) =>
       _ClassOrMixinDecl._(decl, null);
+  // Wrap a mixin declaration.
   factory _ClassOrMixinDecl.mixinDecl(MixinDeclaration decl) =>
       _ClassOrMixinDecl._(null, decl);
 
+  // Return members for the stored class or mixin.
   List<ClassMember> get members =>
       classDecl != null ? classDecl!.members : mixinDecl!.members;
 }

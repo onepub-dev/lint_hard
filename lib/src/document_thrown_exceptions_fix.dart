@@ -13,16 +13,20 @@ class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
     'Document thrown exceptions',
   );
 
+  // Wire the fix into the analysis server context.
   DocumentThrownExceptionsFix({required super.context});
 
   @override
+  // Apply within a single file without needing broader analysis.
   CorrectionApplicability get applicability =>
       CorrectionApplicability.acrossSingleFile;
 
   @override
+  // Expose the fix kind identifier for this lint.
   FixKind get fixKind => _fixKind;
 
   @override
+  // Insert missing Throws docs for the reported executable.
   Future<void> compute(ChangeBuilder builder) async {
     if (diagnostic?.diagnosticCode != DocumentThrownExceptions.code) return;
 
@@ -51,6 +55,7 @@ class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
   }
 }
 
+// Find the nearest executable declaration relevant to the diagnostic node.
 _ExecutableTarget? _findTarget(AstNode node) {
   final method = node.thisOrAncestorOfType<MethodDeclaration>();
   if (method != null) {
@@ -82,6 +87,7 @@ _ExecutableTarget? _findTarget(AstNode node) {
   return null;
 }
 
+// Locate the first character offset for the line containing offset.
 int _lineStart(String content, int offset) {
   var i = offset - 1;
   while (i >= 0) {
@@ -97,6 +103,7 @@ int _lineStart(String content, int offset) {
   return 0;
 }
 
+// Capture the leading whitespace for the line containing offset.
 String _indentAtOffset(String content, int offset) {
   final start = _lineStart(content, offset);
   var i = start;
@@ -113,6 +120,7 @@ class _ExecutableTarget {
   final Comment? documentationComment;
   final int declarationOffset;
 
+  // Bundle the relevant pieces of an executable declaration.
   _ExecutableTarget({
     required this.body,
     required this.documentationComment,
