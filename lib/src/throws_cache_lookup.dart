@@ -13,6 +13,7 @@ class ThrowsCacheLookup {
   final Map<String, String> packageSources;
   final String? sdkVersion;
   final String? sdkRoot;
+  final String? flutterVersion;
 
   ThrowsCacheLookup({
     required this.cache,
@@ -20,6 +21,7 @@ class ThrowsCacheLookup {
     required this.packageSources,
     required this.sdkVersion,
     required this.sdkRoot,
+    required this.flutterVersion,
   });
 
   List<String> lookup(ExecutableElement element) {
@@ -27,9 +29,10 @@ class ThrowsCacheLookup {
     final scheme = uri.scheme;
     if (scheme == 'package') {
       final package = uri.pathSegments.isEmpty ? '' : uri.pathSegments.first;
-      final version = packageVersions[package];
-      if (version == null) return const <String>[];
       final sourceId = packageSources[package];
+      final version =
+          sourceId == 'sdk' ? flutterVersion : packageVersions[package];
+      if (version == null) return const <String>[];
       final file =
           cache.openPackage(package, version, sourceId: sourceId);
       if (file == null) return const <String>[];
@@ -59,8 +62,9 @@ class ThrowsCacheLookup {
     final missingPackages = <String>[];
     for (final entry in packageVersions.entries) {
       final package = entry.key;
-      final version = entry.value;
       final sourceId = packageSources[package];
+      final version =
+          sourceId == 'sdk' ? flutterVersion ?? entry.value : entry.value;
       final path = cache.packageCachePath(
         package,
         version,
@@ -96,12 +100,14 @@ class ThrowsCacheLookup {
     final cache = ThrowsCache(cacheRoot);
     final sdkVersion = _sdkVersion();
     final sdkRoot = _sdkRootFromExecutable();
+    final flutterVersion = _flutterVersion(sdkRoot);
     return ThrowsCacheLookup(
       cache: cache,
       packageVersions: packageVersions,
       packageSources: packageSources,
       sdkVersion: sdkVersion,
       sdkRoot: sdkRoot,
+      flutterVersion: flutterVersion,
     );
   }
 }
@@ -230,6 +236,31 @@ String? _sdkRootFromExecutable() {
   if (exec.isEmpty) return null;
   final binDir = File(exec).parent;
   return binDir.parent.path;
+}
+
+String? _flutterVersion(String? sdkRoot) {
+  final envRoot = Platform.environment['FLUTTER_ROOT'];
+  final root = envRoot == null || envRoot.isEmpty
+      ? _flutterRootFromSdk(sdkRoot)
+      : envRoot;
+  if (root == null || root.isEmpty) return null;
+  final versionFile = File(p.join(root, 'version'));
+  if (versionFile.existsSync()) {
+    final value = versionFile.readAsStringSync().trim();
+    if (value.isNotEmpty) return value;
+  }
+  return null;
+}
+
+String? _flutterRootFromSdk(String? sdkRoot) {
+  if (sdkRoot == null) return null;
+  final candidate = p.normalize(p.join(sdkRoot, '..', '..', '..'));
+  final packagesDir = Directory(p.join(candidate, 'packages'));
+  final flutterBin = File(p.join(candidate, 'bin', 'flutter'));
+  if (packagesDir.existsSync() && flutterBin.existsSync()) {
+    return candidate;
+  }
+  return null;
 }
 
 String? _sdkLibraryUri(Uri uri, String sdkRoot) {

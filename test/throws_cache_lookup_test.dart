@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:lint_hard/src/throws_cache.dart';
 import 'package:lint_hard/src/throws_cache_lookup.dart';
 import 'package:lint_hard/src/throws_cache_writer.dart';
 import 'package:path/path.dart' as p;
@@ -134,6 +135,38 @@ packages:
 
       final missing = lookup!.missingCaches();
       expect(missing.sdkMissing, isFalse);
+    } finally {
+      dir.deleteSync(recursive: true);
+    }
+  });
+
+  test('missingCaches uses flutter version for sdk packages', () {
+    final dir = Directory.systemTemp.createTempSync('throws_cache_lookup_');
+    try {
+      final cacheRoot = p.join(dir.path, 'pub-cache', 'lint_hard', 'cache');
+      final flutterFile = File(p.join(
+        cacheRoot,
+        'throws',
+        'v1',
+        'package',
+        'flutter',
+        'sdk',
+        '3.3.0.throws',
+      ));
+      ThrowsCacheWriter.writeFileSync(flutterFile, {
+        'key': ['BadStateException'],
+      });
+
+      final lookup = ThrowsCacheLookup(
+        cache: ThrowsCache(cacheRoot),
+        packageVersions: const {'flutter': '0.0.0'},
+        packageSources: const {'flutter': 'sdk'},
+        sdkVersion: null,
+        sdkRoot: null,
+        flutterVersion: '3.3.0',
+      );
+      final missing = lookup.missingCaches();
+      expect(missing.missingPackages, isEmpty);
     } finally {
       dir.deleteSync(recursive: true);
     }

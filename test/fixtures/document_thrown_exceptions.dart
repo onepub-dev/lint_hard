@@ -10,7 +10,7 @@ class MissingFile implements Exception {}
 class MissingFileException implements Exception {}
 
 class Sample {
-  @Throws([BadStateException])
+  @Throws(BadStateException)
   void documentedMethod() {
     throw BadStateException();
   }
@@ -27,48 +27,48 @@ class Sample {
     RegExp('[');
   }
 
-  @Throws([MissingFileException])
+  @Throws(MissingFileException)
   void documentedMultiLineThrows() {
     throw MissingFileException();
   }
 
-  @Throws([BadStateException])
+  @Throws(BadStateException)
   void documentedThrowsWithArticle() {
     throw BadStateException();
   }
 
-  @Throws([MissingFileException])
+  @Throws(MissingFileException)
   void documentedThrowsMidSentence() {
     throw MissingFileException();
   }
 
-  @Throws([ThrowSpec(MissingFileException, 'Missing input')])
+  @Throws(MissingFileException, reason: 'Missing input')
   void documentedThrowsWithReason() {
     throw MissingFileException();
   }
 
-  @Throws([BadStateException])
+  @Throws(BadStateException)
   void annotatedMissingException() {
     throw BadStateException();
     throw MissingFileException();
   }
 
-  @Throws([ThrowSpec(BadStateException, 'bad')])
+  @Throws(BadStateException, reason: 'bad')
   void annotatedMissingExceptionWithSpec() {
     throw BadStateException();
     throw MissingFileException();
   }
 
-  @Throws([
-    MissingFileException,
-    BadStateException,
-    InvalidArgException,
-  ])
+  @Throws(MissingFileException)
+  @Throws(BadStateException)
+  @Throws(InvalidArgException)
   void documentedThrowsList() {
     throw MissingFileException();
   }
 
-  @Throws([MissingFile, BadState, InvalidArg])
+  @Throws(MissingFile)
+  @Throws(BadState)
+  @Throws(InvalidArg)
   void documentedThrowsListWithSpaces() {
     if (true) {
       throw MissingFile();
@@ -125,7 +125,7 @@ class Sample {
     }
   }
 
-  @Throws([BadStateException])
+  @Throws(BadStateException)
   void documentedThrowsNoBody() {}
 
   void callerUsesDocThrows() {
@@ -144,7 +144,7 @@ class Sample {
     }
   }
 
-  @Throws([BadStateException])
+  @Throws(BadStateException)
   Sample.named() {
     throw BadStateException();
   }
@@ -154,7 +154,7 @@ class Sample {
   }
 }
 
-@Throws([BadStateException])
+@Throws(BadStateException)
 void documentedTopLevel() {
   throw BadStateException();
 }

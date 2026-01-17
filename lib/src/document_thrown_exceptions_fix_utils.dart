@@ -31,28 +31,12 @@ List<SourceEdit> documentThrownExceptionEdits(
     if (missing.isEmpty) continue;
 
     final insertOffset = _annotationInsertOffset(content, target);
-    final indent = indentAtOffset(content, insertOffset);
-    final types = (missing.toList()..sort()).join(', ');
-
-    final throwsAnnotation = _findThrowsAnnotation(target.metadata);
-    if (throwsAnnotation != null) {
-      final listLiteral = _throwsListLiteral(throwsAnnotation);
-      if (listLiteral != null) {
-        final insertOffset = listLiteral.rightBracket.offset;
-        final prefix = listLiteral.elements.isEmpty ? '' : ', ';
-        edits.add(
-          SourceEdit(insertOffset, 0, '$prefix$types'),
-        );
-      } else {
-        edits.add(
-          SourceEdit(insertOffset, 0, '$indent@Throws([$types])\n'),
-        );
-      }
-    } else {
-      edits.add(
-        SourceEdit(insertOffset, 0, '$indent@Throws([$types])\n'),
-      );
-    }
+    final indent = indentAtOffset(content, target.declarationOffset);
+    final sortedMissing = missing.toList()..sort();
+    final lines = [for (final type in sortedMissing) '@Throws($type)'];
+    edits.add(
+      SourceEdit(insertOffset, 0, '$indent${lines.join("\n$indent")}\n'),
+    );
     if (!hasImport) {
       final insertion = _importInsertion(unitResult.unit, content);
       edits.add(SourceEdit(insertion.offset, 0, insertion.text));
@@ -148,29 +132,6 @@ String? findProjectRoot(String filePath) {
   }
 }
 
-Annotation? _findThrowsAnnotation(NodeList<Annotation>? metadata) {
-  if (metadata == null || metadata.isEmpty) return null;
-  for (final annotation in metadata) {
-    if (_annotationName(annotation) == 'Throws') return annotation;
-  }
-  return null;
-}
-
-String? _annotationName(Annotation annotation) {
-  final name = annotation.name;
-  if (name is SimpleIdentifier) return name.name;
-  if (name is PrefixedIdentifier) return name.identifier.name;
-  return null;
-}
-
-ListLiteral? _throwsListLiteral(Annotation annotation) {
-  final args = annotation.arguments?.arguments;
-  if (args == null || args.isEmpty) return null;
-  final first = args.first;
-  if (first is ListLiteral) return first;
-  return null;
-}
-
 bool _hasThrowsImport(CompilationUnit unit) {
   for (final directive in unit.directives) {
     if (directive is ImportDirective &&
@@ -264,24 +225,14 @@ _ImportInsertion _importInsertion(CompilationUnit unit, String content) {
 }
 
 int _annotationInsertOffset(String content, ExecutableTarget target) {
+  if (target.metadata != null && target.metadata!.isNotEmpty) {
+    return _lineOffsetAfter(content, target.metadata!.last.end);
+  }
+
   final comment = target.documentationComment;
   if (comment == null) return lineStart(content, target.declarationOffset);
 
-  var i = comment.end;
-  while (i < content.length && !_isLineBreak(content.codeUnitAt(i))) {
-    i++;
-  }
-
-  if (i < content.length && content.codeUnitAt(i) == 0x0D) {
-    i++;
-    if (i < content.length && content.codeUnitAt(i) == 0x0A) {
-      i++;
-    }
-  } else if (i < content.length && content.codeUnitAt(i) == 0x0A) {
-    i++;
-  }
-
-  return i;
+  return _lineOffsetAfter(content, comment.end);
 }
 
 String _importText(
@@ -304,6 +255,23 @@ String _importText(
 }
 
 bool _isLineBreak(int codeUnit) => codeUnit == 0x0A || codeUnit == 0x0D;
+
+int _lineOffsetAfter(String content, int offset) {
+  var i = offset;
+  while (i < content.length && !_isLineBreak(content.codeUnitAt(i))) {
+    i++;
+  }
+
+  if (i < content.length && content.codeUnitAt(i) == 0x0D) {
+    i++;
+    if (i < content.length && content.codeUnitAt(i) == 0x0A) {
+      i++;
+    }
+  } else if (i < content.length && content.codeUnitAt(i) == 0x0A) {
+    i++;
+  }
+  return i;
+}
 
 int _lineBreakCount(String content, int start, int end) {
   var count = 0;

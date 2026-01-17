@@ -77,12 +77,12 @@ Example:
 ```dart
 import 'package:lint_hard/throws.dart';
 
-@Throws([FormatException])
+@Throws(FormatException)
 void parseInput(String value) {
   throw FormatException('Invalid input');
 }
 
-@Throws([ThrowSpec(FormatException, 'Bad format')])
+@Throws(FormatException, reason: 'Bad format')
 void parseWithReason(String value) {
   throw FormatException('Invalid input');
 }

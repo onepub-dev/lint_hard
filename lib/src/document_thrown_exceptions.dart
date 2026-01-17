@@ -15,7 +15,7 @@ class DocumentThrownExceptions extends AnalysisRule {
     'document_thrown_exceptions',
     'Document thrown exception types with @Throws. Missing: {0}.',
     correctionMessage:
-        'Add @Throws([ExceptionType]) for each thrown exception class.',
+        'Add @Throws(ExceptionType) for each thrown exception class.',
   );
 
   // Configure the lint rule metadata.
@@ -208,14 +208,10 @@ Set<String> _annotationThrownTypes(NodeList<Annotation>? metadata) {
     final args = annotation.arguments?.arguments;
     if (args == null || args.isEmpty) continue;
     final first = args.first;
-    if (first is ListLiteral) {
-      for (final element in first.elements) {
-        if (element is! Expression) continue;
-        final normalized = _extractThrowTypeName(element);
-        if (normalized != null) {
-          types.add(normalized);
-        }
-      }
+    if (first is! Expression || first is ListLiteral) continue;
+    final normalized = _extractThrowTypeName(first);
+    if (normalized != null) {
+      types.add(normalized);
     }
   }
   return types;
@@ -229,15 +225,6 @@ String? _annotationName(Annotation annotation) {
 }
 
 String? _extractThrowTypeName(Expression expression) {
-  if (expression is InstanceCreationExpression) {
-    final ctorName = expression.constructorName.type.name.lexeme;
-    if (ctorName == 'ThrowSpec') {
-      final args = expression.argumentList.arguments;
-      if (args.isNotEmpty) {
-        return _normalizeTypeName(args.first.toSource());
-      }
-    }
-  }
   return _normalizeTypeName(expression.toSource());
 }
 

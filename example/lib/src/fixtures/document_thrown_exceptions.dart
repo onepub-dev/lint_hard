@@ -7,7 +7,7 @@ class Thrower {
   }
 
   /// Throws [BadStateException] when invalid.
-  @Throws([BadStateException])
+  @Throws(BadStateException)
   Thrower.named() {
     throw BadStateException();
   }

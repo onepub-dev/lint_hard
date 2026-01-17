@@ -45,59 +45,23 @@ class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
 
     final content = unitResult.content;
     final insertOffset = _annotationInsertOffset(content, target);
-    final indent = indentAtOffset(content, insertOffset);
+    final indent = indentAtOffset(content, target.declarationOffset);
 
-    final types = (missing.toList()..sort()).join(', ');
+    final lines = [
+      for (final type in missing.toList()..sort()) '@Throws($type)',
+    ];
 
     await builder.addDartFileEdit(file, (builder) {
       if (!_hasThrowsImport(unitResult.unit)) {
         final insertion = _importInsertion(unitResult.unit, content);
         builder.addSimpleInsertion(insertion.offset, insertion.text);
       }
-      final throwsAnnotation = _findThrowsAnnotation(target.metadata);
-      if (throwsAnnotation != null) {
-        final listLiteral = _throwsListLiteral(throwsAnnotation);
-        if (listLiteral != null) {
-          final insertOffset = listLiteral.rightBracket.offset;
-          final prefix = listLiteral.elements.isEmpty ? '' : ', ';
-          builder.addSimpleInsertion(insertOffset, '$prefix$types');
-        } else {
-          builder.addSimpleInsertion(
-            insertOffset,
-            '$indent@Throws([$types])\n',
-          );
-        }
-      } else {
-        builder.addSimpleInsertion(
-          insertOffset,
-          '$indent@Throws([$types])\n',
-        );
-      }
+      builder.addSimpleInsertion(
+        insertOffset,
+        '$indent${lines.join("\n$indent")}\n',
+      );
     });
   }
-}
-
-Annotation? _findThrowsAnnotation(NodeList<Annotation>? metadata) {
-  if (metadata == null || metadata.isEmpty) return null;
-  for (final annotation in metadata) {
-    if (_annotationName(annotation) == 'Throws') return annotation;
-  }
-  return null;
-}
-
-String? _annotationName(Annotation annotation) {
-  final name = annotation.name;
-  if (name is SimpleIdentifier) return name.name;
-  if (name is PrefixedIdentifier) return name.identifier.name;
-  return null;
-}
-
-ListLiteral? _throwsListLiteral(Annotation annotation) {
-  final args = annotation.arguments?.arguments;
-  if (args == null || args.isEmpty) return null;
-  final first = args.first;
-  if (first is ListLiteral) return first;
-  return null;
 }
 
 bool _hasThrowsImport(CompilationUnit unit) {
@@ -214,24 +178,14 @@ String _importText(
 bool _isLineBreak(int codeUnit) => codeUnit == 0x0A || codeUnit == 0x0D;
 
 int _annotationInsertOffset(String content, ExecutableTarget target) {
+  if (target.metadata != null && target.metadata!.isNotEmpty) {
+    return _lineOffsetAfter(content, target.metadata!.last.end);
+  }
+
   final comment = target.documentationComment;
   if (comment == null) return lineStart(content, target.declarationOffset);
 
-  var i = comment.end;
-  while (i < content.length && !_isLineBreak(content.codeUnitAt(i))) {
-    i++;
-  }
-
-  if (i < content.length && content.codeUnitAt(i) == 0x0D) {
-    i++;
-    if (i < content.length && content.codeUnitAt(i) == 0x0A) {
-      i++;
-    }
-  } else if (i < content.length && content.codeUnitAt(i) == 0x0A) {
-    i++;
-  }
-
-  return i;
+  return _lineOffsetAfter(content, comment.end);
 }
 
 int _lineBreakCount(String content, int start, int end) {
@@ -250,6 +204,23 @@ int _lineBreakCount(String content, int start, int end) {
     i++;
   }
   return count;
+}
+
+int _lineOffsetAfter(String content, int offset) {
+  var i = offset;
+  while (i < content.length && !_isLineBreak(content.codeUnitAt(i))) {
+    i++;
+  }
+
+  if (i < content.length && content.codeUnitAt(i) == 0x0D) {
+    i++;
+    if (i < content.length && content.codeUnitAt(i) == 0x0A) {
+      i++;
+    }
+  } else if (i < content.length && content.codeUnitAt(i) == 0x0A) {
+    i++;
+  }
+  return i;
 }
 
 class _ImportInfo {

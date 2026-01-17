@@ -247,7 +247,7 @@ void main() {
         SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
     expect(
       updated,
-      contains('@Throws([BadStateException])\n  void throwCaughtWithRethrow('),
+      contains('@Throws(BadStateException)\n  void throwCaughtWithRethrow('),
     );
   });
 
@@ -282,7 +282,8 @@ void main() {
     expect(
       updated,
       contains(
-        '@Throws([BadStateException, MissingFileException])\n'
+        '@Throws(BadStateException)\n'
+        '  @Throws(MissingFileException)\n'
         '  void undocumentedMultipleThrows(',
       ),
     );
@@ -317,12 +318,12 @@ void main() {
     final updated =
         SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
     final match = RegExp(
-      r'@Throws\(\[BadStateException\]\)\s+void duplicatedThrows',
+      r'@Throws\(BadStateException\)\s+void duplicatedThrows',
     ).allMatches(updated);
     expect(match.length, equals(1));
   });
 
-  test('fix updates existing @Throws list', () async {
+  test('fix adds missing @Throws annotations', () async {
     final method = _method(resolvedUnit.unit, 'annotatedMissingException');
 
     final diagnostic = Diagnostic.forValues(
@@ -353,13 +354,14 @@ void main() {
     expect(
       updated,
       contains(
-        '@Throws([BadStateException, MissingFileException])\n'
+        '@Throws(BadStateException)\n'
+        '  @Throws(MissingFileException)\n'
         '  void annotatedMissingException(',
       ),
     );
   });
 
-  test('fix updates @Throws list with ThrowSpec', () async {
+  test('fix adds @Throws annotations with reason', () async {
     final method =
         _method(resolvedUnit.unit, 'annotatedMissingExceptionWithSpec');
 
@@ -391,7 +393,8 @@ void main() {
     expect(
       updated,
       contains(
-        "@Throws([ThrowSpec(BadStateException, 'bad'), MissingFileException])\n"
+        "@Throws(BadStateException, reason: 'bad')\n"
+        '  @Throws(MissingFileException)\n'
         '  void annotatedMissingExceptionWithSpec(',
       ),
     );
@@ -432,7 +435,7 @@ void main() {
     final updated =
         SourceEdit.applySequence(resolved.unit.content, fileEdit.edits);
     expect(updated, contains("import 'package:lint_hard/throws.dart';"));
-    expect(updated, contains('@Throws([BadStateException])'));
+    expect(updated, contains('@Throws(BadStateException)'));
   });
 
   test('fix keeps import and annotation formatting', () async {
@@ -482,7 +485,7 @@ void main() {
     expect(
       updated,
       contains(
-        '@Throws([BadStateException])\n'
+        '@Throws(BadStateException)\n'
         'void undocumentedTopLevel(',
       ),
     );
@@ -529,7 +532,7 @@ void main() {
       updated,
       contains(
         '/// Sets the permissions on a file.\n'
-        '@Throws([ChModException])\n'
+        '@Throws(ChModException)\n'
         'void chmod(',
       ),
     );
@@ -697,6 +700,7 @@ class _TestThrowsCacheLookup extends ThrowsCacheLookup {
         packageSources: const {},
         sdkVersion: 'test',
         sdkRoot: null,
+        flutterVersion: null,
       );
 
   @override

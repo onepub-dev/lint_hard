@@ -20,13 +20,15 @@ i.e. an new sdk or package version exists for which we don't have an index.
 
 - [x] review the code for additional tests that we should add and add them.
 
-- [] change the throws annotation to take a single exception and then add
+- [x] change the throws annotation to take a single exception and then add
 mulitiple @throws to method/function/... as needed. This also gives us a simplier
 syntax for providing the reason.  
 ```
 @Throws(BadState, reason: "xxxx")
 ```
 The reason is optional. 
+This still doesn't show throw list in documentation, but after making
+a call the linter will warn you about new exceptions that are thrown.
 
 - [x] The lint error should show the list of missing exception types.
 
@@ -54,9 +56,8 @@ I'm concerned that by using an annotation the vs-code (and other) IDE won't show
 the exceptions - particurly for external packges. Do we need an vs-code/andriod studio
 extension so that these are show. Can we get the ide teams to support our annotations.
 
-- [] index tool needs to index the flutter sdk.
+- [x] index tool needs to index the flutter sdk.
 
-- [] move the throws lint and associated tooling into its own package document_throws.
 
 - [] if an exception listed in the @Throws declaration is from an alised import
 then the lint fix commend generates an error as the exception is unkown due to the 
@@ -78,6 +79,17 @@ class MyYaml {
   }
   ```
   YamlException needs to be written as y.YamlException.
+
+ - [] move the throws lint and associated tooling into its own package document_throws.
+ the @Throws annotation should be placed in its own package as its needed for 
+ production code not just a dev dependency - is there any advantage to this, 
+ we still get dev conflicts.
+
+ - [] consider change where we store the indices so that a dart pub cache reset
+ also resets our indicies - can we safely store index in the existing package
+ directory?
+
+ - [] document the use of 'peek definition' in vs-code to see the annotations.
 
   - [] When a library is a 'part of' another library the imports have to be
   placed in the part library. Currently we place them in the 'part of' library

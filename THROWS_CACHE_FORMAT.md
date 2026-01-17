@@ -10,19 +10,40 @@ used by lint_hard to look up thrown exception types for external libraries.
 - Fixed-size index records for fast scanning and predictable I/O.
 
 ## File Naming and Location
-Per package version:
+Cache files live under the pub cache root:
 
 ```
-.lint_hard/cache/throws/v1/package/<package>/<version>.throws
+$PUB_CACHE/lint_hard/cache/throws/v1/...
+```
+
+Per package version and source:
+
+```
+$PUB_CACHE/lint_hard/cache/throws/v1/package/<package>/<source_id>/<version>.throws
 ```
 
 Per SDK version:
 
 ```
-.lint_hard/cache/throws/v1/sdk/<sdk_version>.throws
+$PUB_CACHE/lint_hard/cache/throws/v1/sdk/<sdk_version>.throws
 ```
 
-`<sdk_version>` should use the full Dart SDK version string.
+Per Flutter SDK package version:
+
+```
+$PUB_CACHE/lint_hard/cache/throws/v1/package/<package>/sdk/<flutter_version>.throws
+```
+
+`<sdk_version>` should use the full Dart SDK version string. `<flutter_version>`
+should use the full Flutter SDK version string from `<flutter_root>/version`.
+
+### Source IDs
+`<source_id>` matches the package source:
+
+- `hosted-<host>` (pub.dev or custom host)
+- `git-<url@ref>`
+- `path-<path>`
+- `sdk` (Flutter SDK packages)
 
 ## Binary Layout
 All integers are little-endian.
