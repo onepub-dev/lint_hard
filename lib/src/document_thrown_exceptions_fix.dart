@@ -5,6 +5,8 @@ import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dar
 import 'package:analyzer_plugin/utilities/fixes/fixes.dart';
 
 import 'document_thrown_exceptions.dart';
+import 'document_thrown_exceptions_fix_utils.dart';
+import 'throws_cache_lookup.dart';
 
 class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
   static const FixKind _fixKind = FixKind(
@@ -26,104 +28,101 @@ class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
   FixKind get fixKind => _fixKind;
 
   @override
-  // Insert missing Throws docs for the reported executable.
+  // Insert missing @Throws annotations for the reported executable.
   Future<void> compute(ChangeBuilder builder) async {
     if (diagnostic?.diagnosticCode != DocumentThrownExceptions.code) return;
 
-    final target = _findTarget(node);
+    final target = findExecutableTarget(node);
     if (target == null) return;
 
-    final missing =
-        missingThrownTypeDocs(target.body, target.documentationComment);
+    final missing = missingThrownTypeDocs(
+      target.body,
+      target.metadata,
+      unitsByPath: unitsByPathFromResolvedUnits(libraryResult.units),
+      externalLookup: _externalLookupForPath(file),
+    );
     if (missing.isEmpty) return;
 
     final content = unitResult.content;
-    final declLineStart = _lineStart(content, target.declarationOffset);
-    final indent = _indentAtOffset(content, target.declarationOffset);
+    final declLineStart = lineStart(content, target.declarationOffset);
+    final indent = indentAtOffset(content, target.declarationOffset);
 
-    final lines = (missing.toList()..sort())
-        .map((type) => '$indent/// Throws [$type].')
-        .join('\n');
+    final types = (missing.toList()..sort()).join(', ');
 
     await builder.addDartFileEdit(file, (builder) {
-      if (target.documentationComment != null) {
-        builder.addSimpleInsertion(target.documentationComment!.end, '\n$lines');
+      if (!_hasThrowsImport(unitResult.unit)) {
+        final insertAt = _importInsertOffset(unitResult.unit, content);
+        builder.addSimpleInsertion(
+          insertAt,
+          "import 'package:lint_hard/throws.dart';\n",
+        );
+      }
+      final throwsAnnotation = _findThrowsAnnotation(target.metadata);
+      if (throwsAnnotation != null) {
+        final listLiteral = _throwsListLiteral(throwsAnnotation);
+        if (listLiteral != null) {
+          final insertOffset = listLiteral.rightBracket.offset;
+          final prefix = listLiteral.elements.isEmpty ? '' : ', ';
+          builder.addSimpleInsertion(insertOffset, '$prefix$types');
+        } else {
+          builder.addSimpleInsertion(
+            declLineStart,
+            '$indent@Throws([$types])\n',
+          );
+        }
       } else {
-        builder.addSimpleInsertion(declLineStart, '$lines\n');
+        builder.addSimpleInsertion(
+          declLineStart,
+          '$indent@Throws([$types])\n',
+        );
       }
     });
   }
 }
 
-// Find the nearest executable declaration relevant to the diagnostic node.
-_ExecutableTarget? _findTarget(AstNode node) {
-  final method = node.thisOrAncestorOfType<MethodDeclaration>();
-  if (method != null) {
-    return _ExecutableTarget(
-      body: method.body,
-      documentationComment: method.documentationComment,
-      declarationOffset: method.offset,
-    );
+Annotation? _findThrowsAnnotation(NodeList<Annotation>? metadata) {
+  if (metadata == null || metadata.isEmpty) return null;
+  for (final annotation in metadata) {
+    if (_annotationName(annotation) == 'Throws') return annotation;
   }
-
-  final ctor = node.thisOrAncestorOfType<ConstructorDeclaration>();
-  if (ctor != null) {
-    return _ExecutableTarget(
-      body: ctor.body,
-      documentationComment: ctor.documentationComment,
-      declarationOffset: ctor.offset,
-    );
-  }
-
-  final function = node.thisOrAncestorOfType<FunctionDeclaration>();
-  if (function != null && function.parent is CompilationUnit) {
-    return _ExecutableTarget(
-      body: function.functionExpression.body,
-      documentationComment: function.documentationComment,
-      declarationOffset: function.offset,
-    );
-  }
-
   return null;
 }
 
-// Locate the first character offset for the line containing offset.
-int _lineStart(String content, int offset) {
-  var i = offset - 1;
-  while (i >= 0) {
-    final ch = content.codeUnitAt(i);
-    if (ch == 0x0A) return i + 1; // \n
-    if (ch == 0x0D) {
-      final isCrLf =
-          (i + 1 < content.length) && content.codeUnitAt(i + 1) == 0x0A;
-      return isCrLf ? i + 2 : i + 1;
+String? _annotationName(Annotation annotation) {
+  final name = annotation.name;
+  if (name is SimpleIdentifier) return name.name;
+  if (name is PrefixedIdentifier) return name.identifier.name;
+  return null;
+}
+
+ListLiteral? _throwsListLiteral(Annotation annotation) {
+  final args = annotation.arguments?.arguments;
+  if (args == null || args.isEmpty) return null;
+  final first = args.first;
+  if (first is ListLiteral) return first;
+  return null;
+}
+
+bool _hasThrowsImport(CompilationUnit unit) {
+  for (final directive in unit.directives) {
+    if (directive is ImportDirective &&
+        directive.uri.stringValue == 'package:lint_hard/throws.dart') {
+      return true;
     }
-    i--;
   }
-  return 0;
+  return false;
 }
 
-// Capture the leading whitespace for the line containing offset.
-String _indentAtOffset(String content, int offset) {
-  final start = _lineStart(content, offset);
-  var i = start;
-  while (i < offset) {
-    final ch = content.codeUnitAt(i);
-    if (ch != 0x20 && ch != 0x09) break; // space or tab
-    i++;
-  }
-  return content.substring(start, i);
+int _importInsertOffset(CompilationUnit unit, String content) {
+  if (unit.directives.isEmpty) return 0;
+  final last = unit.directives.last;
+  final end = last.end;
+  final needsNewline = end < content.length && content.codeUnitAt(end) != 0x0A;
+  return needsNewline ? end + 1 : end;
 }
 
-class _ExecutableTarget {
-  final FunctionBody body;
-  final Comment? documentationComment;
-  final int declarationOffset;
-
-  // Bundle the relevant pieces of an executable declaration.
-  _ExecutableTarget({
-    required this.body,
-    required this.documentationComment,
-    required this.declarationOffset,
-  });
+ThrowsCacheLookup? _externalLookupForPath(String filePath) {
+  final root = findProjectRoot(filePath);
+  if (root == null) return null;
+  return ThrowsCacheLookup.forProjectRoot(root);
 }

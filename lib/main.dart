@@ -5,6 +5,7 @@ import 'src/document_thrown_exceptions.dart';
 import 'src/document_thrown_exceptions_fix.dart';
 import 'src/reorder_members_fix.dart';
 import 'src/sort_fields_then_constructors.dart';
+import 'src/throws_index_up_to_date.dart';
 
 final plugin = LintHardPlugin();
 
@@ -21,6 +22,7 @@ class LintHardPlugin extends Plugin {
       DocumentThrownExceptions.code,
       DocumentThrownExceptionsFix.new,
     );
+    registry.registerWarningRule(ThrowsIndexUpToDate());
     registry.registerWarningRule(FieldsFirstConstructorsNext());
     registry.registerFixForRule(
       FieldsFirstConstructorsNext.code,

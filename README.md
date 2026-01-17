@@ -11,6 +11,8 @@ Using Lint Hard will require you to do a little more work as you code but will s
 
 Lint Hard forces you to use consistent standards across your code base which makes it easier for other developers to read your code. It will also help when you come back to your code in 12 months time.
 
+Style note: please avoid emojis in docs and issues, and use bullet lists sparingly.
+
 ## drop in replacement
 You can use Lint Hard as a drop in replacement for your existing lint package (pedantic, lints, flutter_lints ...).
 
@@ -65,6 +67,26 @@ To install lint_hard into your app or package:
           document_thrown_exceptions: true
           fields_first_constructors_next: true
     ```
+
+## documenting thrown exceptions
+
+The `document_thrown_exceptions` lint uses the `@Throws` annotation from this package.
+
+Example:
+
+```dart
+import 'package:lint_hard/throws.dart';
+
+@Throws([FormatException])
+void parseInput(String value) {
+  throw FormatException('Invalid input');
+}
+
+@Throws([ThrowSpec(FormatException, 'Bad format')])
+void parseWithReason(String value) {
+  throw FormatException('Invalid input');
+}
+```
 
 5. Remove your existing linter
 

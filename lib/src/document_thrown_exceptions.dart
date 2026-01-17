@@ -4,16 +4,18 @@ import 'package:analyzer/analysis_rule/rule_visitor_registry.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
+
+import 'throws_cache_lookup.dart';
 
 class DocumentThrownExceptions extends AnalysisRule {
   static const LintCode code = LintCode(
     'document_thrown_exceptions',
-    'Document thrown exception types in method docs.',
+    'Document thrown exception types with @Throws.',
     correctionMessage:
-        'Add "Throws [ExceptionType]" in the method documentation for each '
-        'thrown exception class.',
+        'Add @Throws([ExceptionType]) for each thrown exception class.',
   );
 
   // Configure the lint rule metadata.
@@ -21,7 +23,7 @@ class DocumentThrownExceptions extends AnalysisRule {
     : super(
         name: code.name,
         description:
-            'Require documentation of each exception class thrown by a '
+            'Require @Throws annotations for each exception class thrown by a '
             'method.',
       );
 
@@ -35,7 +37,7 @@ class DocumentThrownExceptions extends AnalysisRule {
     RuleVisitorRegistry registry,
     RuleContext context,
   ) {
-    final visitor = _Visitor(this);
+    final visitor = _Visitor(this, context);
     registry
       ..addConstructorDeclaration(this, visitor)
       ..addFunctionDeclaration(this, visitor)
@@ -45,16 +47,21 @@ class DocumentThrownExceptions extends AnalysisRule {
 
 class _Visitor extends SimpleAstVisitor<void> {
   final AnalysisRule rule;
+  final RuleContext context;
+  final Map<String, CompilationUnit> unitsByPath;
+  final ThrowsCacheLookup? externalLookup;
 
   // Hold the rule to report diagnostics.
-  _Visitor(this.rule);
+  _Visitor(this.rule, this.context)
+    : unitsByPath = _unitsByPathFromContext(context),
+      externalLookup = _throwsCacheLookupFromContext(context);
 
   @override
   // Inspect method bodies for undocumented throw types.
   void visitMethodDeclaration(MethodDeclaration node) {
     _checkExecutable(
       body: node.body,
-      documentationComment: node.documentationComment,
+      metadata: node.metadata,
       reportToken: node.name,
     );
   }
@@ -64,7 +71,7 @@ class _Visitor extends SimpleAstVisitor<void> {
   void visitConstructorDeclaration(ConstructorDeclaration node) {
     _checkExecutable(
       body: node.body,
-      documentationComment: node.documentationComment,
+      metadata: node.metadata,
       reportToken: node.returnType.beginToken,
     );
   }
@@ -75,22 +82,26 @@ class _Visitor extends SimpleAstVisitor<void> {
     if (node.parent is! CompilationUnit) return;
     _checkExecutable(
       body: node.functionExpression.body,
-      documentationComment: node.documentationComment,
+      metadata: node.metadata,
       reportToken: node.name,
     );
   }
 
   void _checkExecutable({
     required FunctionBody body,
-    required Comment? documentationComment,
+    required NodeList<Annotation>? metadata,
     required Token reportToken,
   }) {
     // Fast exit when no throw token appears in the body.
     if (body is EmptyFunctionBody) return;
-    if (!_containsThrowToken(body)) return;
 
     // Report when any thrown types are missing from docs.
-    final missing = missingThrownTypeDocs(body, documentationComment);
+    final missing = missingThrownTypeDocs(
+      body,
+      metadata,
+      unitsByPath: unitsByPath,
+      externalLookup: externalLookup,
+    );
     if (missing.isEmpty) return;
 
     rule.reportAtToken(reportToken);
@@ -98,11 +109,22 @@ class _Visitor extends SimpleAstVisitor<void> {
 }
 
 // Collect thrown exception types via AST traversal.
-_ThrownTypeResults _collectThrownTypes(FunctionBody body) {
-  final collector = _ThrowTypeCollector();
+_ThrownTypeResults _collectThrownTypes(
+  FunctionBody body, {
+  Map<String, CompilationUnit>? unitsByPath,
+  _ThrownTypeResolver? resolver,
+  ThrowsCacheLookup? externalLookup,
+}) {
+  final effectiveResolver =
+      resolver ??
+      (unitsByPath == null
+          ? null
+          : _ThrownTypeResolver(unitsByPath, externalLookup: externalLookup));
+  final collector = _ThrowTypeCollector(effectiveResolver);
   body.accept(collector);
   return _ThrownTypeResults(
     collector.thrownTypes,
+    collector._thrown,
     sawThrowExpression: collector.sawThrowExpression,
     sawUnknownThrowExpression: collector.sawUnknownThrowExpression,
   );
@@ -110,11 +132,13 @@ _ThrownTypeResults _collectThrownTypes(FunctionBody body) {
 
 class _ThrownTypeResults {
   final Set<String> types;
+  final List<_ThrownTypeInfo> infos;
   final bool sawThrowExpression;
   final bool sawUnknownThrowExpression;
 
   const _ThrownTypeResults(
-    this.types, {
+    this.types,
+    this.infos, {
     required this.sawThrowExpression,
     required this.sawUnknownThrowExpression,
   });
@@ -123,11 +147,17 @@ class _ThrownTypeResults {
 // Find thrown types missing from documentation.
 Set<String> missingThrownTypeDocs(
   FunctionBody body,
-  Comment? documentationComment, {
+  NodeList<Annotation>? metadata, {
   bool allowSourceFallback = false,
+  Map<String, CompilationUnit>? unitsByPath,
+  ThrowsCacheLookup? externalLookup,
 }) {
   // Prefer AST; optionally fallback to source parsing for edge cases.
-  final thrownResults = _collectThrownTypes(body);
+  final thrownResults = _collectThrownTypes(
+    body,
+    unitsByPath: unitsByPath,
+    externalLookup: externalLookup,
+  );
   final thrownTypes = thrownResults.types;
   if (thrownTypes.isEmpty &&
       allowSourceFallback &&
@@ -137,19 +167,21 @@ Set<String> missingThrownTypeDocs(
   }
   if (thrownTypes.isEmpty) return <String>{};
 
-  final docText =
-      documentationComment == null ? '' : _docText(documentationComment);
-  final missing = thrownTypes.where((t) => !_docMentionsType(docText, t));
+  final documented = _annotationThrownTypes(metadata);
+  final missing = thrownTypes.where((t) => !documented.contains(t));
   return missing.toSet();
 }
 
-// Join all comment tokens into a searchable string.
-String _docText(Comment comment) {
-  final buffer = StringBuffer();
-  for (final token in comment.tokens) {
-    buffer.writeln(token.lexeme);
-  }
-  return buffer.toString();
+Set<String> collectThrownTypeNames(
+  FunctionBody body, {
+  Map<String, CompilationUnit>? unitsByPath,
+  ThrowsCacheLookup? externalLookup,
+}) {
+  return _collectThrownTypes(
+    body,
+    unitsByPath: unitsByPath,
+    externalLookup: externalLookup,
+  ).types;
 }
 
 // Extract thrown types from source text as a fallback.
@@ -166,36 +198,45 @@ Set<String> _collectThrownTypesFromSource(String source) {
   return types;
 }
 
-// Check for doc links, @throws tags, or "throws" clauses.
-bool _docMentionsType(String docText, String typeName) {
-  if (docText.contains('[$typeName]')) return true;
-  final lower = docText.toLowerCase();
-  if (lower.contains('@throws ${typeName.toLowerCase()}')) return true;
-
-  final normalizedType = _normalizeDocType(typeName);
-  final throwClause = RegExp(
-    r'\bthrows?\b(?:\s+\w+)?(.*?)(?:[.!?]|$)',
-    caseSensitive: false,
-    dotAll: true,
-  );
-  final bracketedType = RegExp(r'\[([^\]]+)\]');
-
-  for (final match in throwClause.allMatches(docText)) {
-    final clause = match.group(1) ?? '';
-    for (final typeMatch in bracketedType.allMatches(clause)) {
-      final docType = _normalizeDocType(typeMatch.group(1) ?? '');
-      if (docType == normalizedType) return true;
+Set<String> _annotationThrownTypes(NodeList<Annotation>? metadata) {
+  if (metadata == null || metadata.isEmpty) return const <String>{};
+  final types = <String>{};
+  for (final annotation in metadata) {
+    if (_annotationName(annotation) != 'Throws') continue;
+    final args = annotation.arguments?.arguments;
+    if (args == null || args.isEmpty) continue;
+    final first = args.first;
+    if (first is ListLiteral) {
+      for (final element in first.elements) {
+        if (element is! Expression) continue;
+        final normalized = _extractThrowTypeName(element);
+        if (normalized != null) {
+          types.add(normalized);
+        }
+      }
     }
   }
-
-  return false;
+  return types;
 }
 
-// Normalize doc types for comparisons across spacing/casing differences.
-String _normalizeDocType(String rawName) {
-  final name = rawName.trim();
-  if (name.isEmpty) return '';
-  return name.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+String? _annotationName(Annotation annotation) {
+  final name = annotation.name;
+  if (name is SimpleIdentifier) return name.name;
+  if (name is PrefixedIdentifier) return name.identifier.name;
+  return null;
+}
+
+String? _extractThrowTypeName(Expression expression) {
+  if (expression is InstanceCreationExpression) {
+    final ctorName = expression.constructorName.type.name.lexeme;
+    if (ctorName == 'ThrowSpec') {
+      final args = expression.argumentList.arguments;
+      if (args.isNotEmpty) {
+        return _normalizeTypeName(args.first.toSource());
+      }
+    }
+  }
+  return _normalizeTypeName(expression.toSource());
 }
 
 class _ThrownTypeInfo {
@@ -206,12 +247,13 @@ class _ThrownTypeInfo {
 }
 
 class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
+  final _ThrownTypeResolver? _resolver;
   final List<_ThrownTypeInfo> _thrown = [];
   final Set<String> thrownTypes = <String>{};
   bool sawThrowExpression = false;
   int _unknownThrowCount = 0;
 
-  _ThrowTypeCollector();
+  _ThrowTypeCollector(this._resolver);
 
   bool get sawUnknownThrowExpression => _unknownThrowCount > 0;
 
@@ -229,14 +271,40 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
   }
 
   @override
+  // Include exceptions from invoked methods/constructors when resolvable.
+  void visitMethodInvocation(MethodInvocation node) {
+    final element = node.methodName.element;
+    if (element is ExecutableElement) {
+      _addInvokedThrows(element);
+    }
+    super.visitMethodInvocation(node);
+  }
+
+  @override
+  // Include exceptions from function-typed invocations when resolvable.
+  void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
+    _addInvokedThrows(node.element);
+    super.visitFunctionExpressionInvocation(node);
+  }
+
+  @override
+  // Include exceptions from constructors when resolvable.
+  void visitInstanceCreationExpression(InstanceCreationExpression node) {
+    _addInvokedThrows(node.constructorName.element);
+    super.visitInstanceCreationExpression(node);
+  }
+
+  @override
   // Skip throws caught by a try/catch without rethrowing.
   void visitTryStatement(TryStatement node) {
-    final bodyCollector = _ThrowTypeCollector();
+    final bodyCollector = _ThrowTypeCollector(_resolver);
     node.body.accept(bodyCollector);
 
     for (final info in bodyCollector._thrown) {
       if (!_isCaughtWithoutRethrow(info, node.catchClauses)) {
-        _recordThrow(info);
+        if (!_catchListHandlesName(node.catchClauses, info.name)) {
+          _recordThrow(info);
+        }
       }
     }
 
@@ -257,6 +325,14 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
   void _recordThrow(_ThrownTypeInfo info) {
     _thrown.add(info);
     thrownTypes.add(info.name);
+  }
+
+  void _addInvokedThrows(ExecutableElement? element) {
+    if (element == null || _resolver == null) return;
+    final invoked = _resolver.thrownTypesForExecutable(element);
+    for (final info in invoked) {
+      _recordThrow(info);
+    }
   }
 
   bool _isCaughtWithoutRethrow(
@@ -316,6 +392,21 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
           catchName == 'Error') {
         return true;
       }
+    }
+    return false;
+  }
+
+  bool _catchListHandlesName(
+    NodeList<CatchClause> catchClauses,
+    String thrownName,
+  ) {
+    for (final clause in catchClauses) {
+      if (_catchRethrows(clause)) continue;
+      final exceptionType = clause.exceptionType;
+      if (exceptionType == null) return true;
+      final catchName = _normalizeCatchTypeName(exceptionType.toSource());
+      if (catchName == null) continue;
+      if (_isCatchAllName(catchName, thrownName)) return true;
     }
     return false;
   }
@@ -393,21 +484,99 @@ String? _catchTypeName(TypeAnnotation exceptionType) {
   return _normalizeCatchTypeName(exceptionType.toSource());
 }
 
+class _ThrownTypeResolver {
+  final Map<String, CompilationUnit> _unitsByPath;
+  final ThrowsCacheLookup? _externalLookup;
+  final Map<ExecutableElement, List<_ThrownTypeInfo>> _cache = {};
+  final Set<ExecutableElement> _inProgress = {};
+
+  _ThrownTypeResolver(this._unitsByPath, {ThrowsCacheLookup? externalLookup})
+    : _externalLookup = externalLookup;
+
+  List<_ThrownTypeInfo> thrownTypesForExecutable(ExecutableElement element) {
+    final cached = _cache[element];
+    if (cached != null) return cached;
+    if (_inProgress.contains(element)) return const <_ThrownTypeInfo>[];
+    _inProgress.add(element);
+
+    final infos = <_ThrownTypeInfo>[];
+    final fragment = element.firstFragment;
+
+    final unit = _unitForFragment(fragment);
+    if (unit != null) {
+      final node = unit.nodeCovering(offset: fragment.offset);
+      final execNode = _executableNodeFrom(node);
+      if (execNode != null) {
+        final body = execNode.body;
+        if (body != null) {
+          final thrownResults = _collectThrownTypes(
+            body,
+            resolver: this,
+          );
+          infos.addAll(thrownResults.infos);
+        }
+      }
+    }
+    if (unit == null) {
+      final cached = _externalLookup?.lookup(element) ?? const <String>[];
+      for (final name in cached) {
+        infos.add(_ThrownTypeInfo(name, null));
+      }
+    }
+
+    _cache[element] = infos;
+    _inProgress.remove(element);
+    return infos;
+  }
+
+  CompilationUnit? _unitForFragment(Fragment fragment) {
+    final source = fragment.libraryFragment?.source;
+    if (source == null) return null;
+    return _unitsByPath[source.fullName];
+  }
+}
+
+_ExecutableNode? _executableNodeFrom(AstNode? node) {
+  final method = node?.thisOrAncestorOfType<MethodDeclaration>();
+  if (method != null) {
+    return _ExecutableNode(method.body);
+  }
+  final ctor = node?.thisOrAncestorOfType<ConstructorDeclaration>();
+  if (ctor != null) {
+    return _ExecutableNode(ctor.body);
+  }
+  final function = node?.thisOrAncestorOfType<FunctionDeclaration>();
+  if (function != null && function.parent is CompilationUnit) {
+    return _ExecutableNode(function.functionExpression.body);
+  }
+  return null;
+}
+
+class _ExecutableNode {
+  final FunctionBody? body;
+
+  const _ExecutableNode(this.body);
+}
+
+Map<String, CompilationUnit> _unitsByPathFromContext(RuleContext context) {
+  final map = <String, CompilationUnit>{};
+  for (final unit in context.allUnits) {
+    map[unit.file.path] = unit.unit;
+  }
+  return map;
+}
+
+ThrowsCacheLookup? _throwsCacheLookupFromContext(RuleContext context) {
+  final root = context.package?.root.path;
+  if (root == null) return null;
+  return ThrowsCacheLookup.forProjectRoot(root);
+}
+
+// Doc-based discovery is intentionally disabled in favor of @Throws.
+
 bool _isCatchAllName(String catchName, String thrownName) {
   if (catchName == 'Object' || catchName == 'dynamic') return true;
   if (catchName == 'Exception') return thrownName.endsWith('Exception');
   if (catchName == 'Error') return thrownName.endsWith('Error');
-  return false;
-}
-
-// Scan tokens to quickly see if a throw exists at all.
-bool _containsThrowToken(FunctionBody body) {
-  var token = body.beginToken;
-  final end = body.endToken;
-  while (true) {
-    if (token.keyword == Keyword.THROW) return true;
-    if (identical(token, end)) break;
-    token = token.next!;
-  }
   return false;
 }
