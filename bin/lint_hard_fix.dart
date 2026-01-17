@@ -63,7 +63,7 @@ Future<void> main(List<String> args) async {
     );
     if (edits.isEmpty) continue;
 
-    edits.sort((a, b) => a.offset.compareTo(b.offset));
+    edits.sort((a, b) => b.offset.compareTo(a.offset));
     editsByPath[filePath] = edits;
   }
 

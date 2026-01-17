@@ -20,4 +20,69 @@ i.e. an new sdk or package version exists for which we don't have an index.
 
 - [x] review the code for additional tests that we should add and add them.
 
+- [] change the throws annotation to take a single exception and then add
+mulitiple @throws to method/function/... as needed. This also gives us a simplier
+syntax for providing the reason.  
+```
+@Throws(BadState, reason: "xxxx")
+```
+The reason is optional. 
+
+- [x] The lint error should show the list of missing exception types.
+
+- [x] AFter adding a Throws annotation the method is still show the missing
+exception lint.
+
+- [] there is a question around the source of a throws clause. 
+If we document a throws because a called method in an external package
+throws (but doesn't document that it throws) the the user may be left
+wondering where the source of the throws is. 
+Should we augment the throws annotation to indicate 'external' and 
+maybe the call that throws it.  Perhaps we only do this if the throws
+isn't documented - which means we need to parse doc comments again.
+The fact that the exception is documented or not could be added to our index.
+
+- [] so the downside to an annotation is that the users production code
+now has to rely on lint_hard.  Should we have a separate package for the
+annotation so dependency is small and introduces no transient dependencies.
+I'm also considering moving this whole throws lint into its own package 
+as some people wont' what the rest of what lint_hard brings with it.
+
+- [] what is our objective - to document what exceptions are thrown by
+the users own code as well as 3rd party packages and the dart and flutter sdks.
+I'm concerned that by using an annotation the vs-code (and other) IDE won't show
+the exceptions - particurly for external packges. Do we need an vs-code/andriod studio
+extension so that these are show. Can we get the ide teams to support our annotations.
+
+- [] index tool needs to index the flutter sdk.
+
+- [] move the throws lint and associated tooling into its own package document_throws.
+
+- [] if an exception listed in the @Throws declaration is from an alised import
+then the lint fix commend generates an error as the exception is unkown due to the 
+missing alias prefix. 
+```
+
+import 'package:lint_hard/throws.dart';
+import 'package:yaml/yaml.dart' as y;
+
+/// wrapper for the YamlDocument
+/// designed to make it easier to read yaml files.
+class MyYaml {
+  late y.YamlDocument _document;
+
+  /// read yaml from string
+@Throws([YamlException])
+  MyYaml.fromString(String content) {
+    _document = _load(content);
+  }
+  ```
+  YamlException needs to be written as y.YamlException.
+
+  - [] When a library is a 'part of' another library the imports have to be
+  placed in the part library. Currently we place them in the 'part of' library
+  which is causing errors.
+
+- [] optimise the code and improve the code structure.
+
 - [] run a performance analysis looking for improvments.

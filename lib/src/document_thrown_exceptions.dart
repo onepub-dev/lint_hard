@@ -13,7 +13,7 @@ import 'throws_cache_lookup.dart';
 class DocumentThrownExceptions extends AnalysisRule {
   static const LintCode code = LintCode(
     'document_thrown_exceptions',
-    'Document thrown exception types with @Throws.',
+    'Document thrown exception types with @Throws. Missing: {0}.',
     correctionMessage:
         'Add @Throws([ExceptionType]) for each thrown exception class.',
   );
@@ -104,7 +104,9 @@ class _Visitor extends SimpleAstVisitor<void> {
     );
     if (missing.isEmpty) return;
 
-    rule.reportAtToken(reportToken);
+    final missingList = missing.toList()..sort();
+    final missingLabel = missingList.join(', ');
+    rule.reportAtToken(reportToken, arguments: [missingLabel]);
   }
 }
 

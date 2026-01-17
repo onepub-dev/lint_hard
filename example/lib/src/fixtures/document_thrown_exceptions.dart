@@ -1,3 +1,4 @@
+import 'package:lint_hard/throws.dart';
 class BadStateException implements Exception {}
 
 class Thrower {
@@ -6,6 +7,7 @@ class Thrower {
   }
 
   /// Throws [BadStateException] when invalid.
+  @Throws([BadStateException])
   Thrower.named() {
     throw BadStateException();
   }

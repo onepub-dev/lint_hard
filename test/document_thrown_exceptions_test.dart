@@ -435,6 +435,106 @@ void main() {
     expect(updated, contains('@Throws([BadStateException])'));
   });
 
+  test('fix keeps import and annotation formatting', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_with_imports.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await _resolveFixture(fixtureFilePath);
+    final unit = resolved.unit.unit;
+    final library = resolved.library;
+    final fn = _function(unit, 'undocumentedTopLevel');
+
+    final diagnostic = Diagnostic.forValues(
+      source: resolved.unit.libraryFragment.source,
+      offset: fn.name.offset,
+      length: fn.name.length,
+      diagnosticCode: DocumentThrownExceptions.code,
+      message: DocumentThrownExceptions.code.problemMessage,
+      correctionMessage: DocumentThrownExceptions.code.correctionMessage,
+    );
+
+    final producerContext = CorrectionProducerContext.createResolved(
+      libraryResult: library,
+      unitResult: resolved.unit,
+      diagnostic: diagnostic,
+      selectionOffset: fn.name.offset,
+      selectionLength: fn.name.length,
+    );
+    final fix = DocumentThrownExceptionsFix(context: producerContext);
+    final builder = ChangeBuilder(session: resolved.unit.session);
+    await fix.compute(builder);
+
+    final edits = builder.sourceChange.edits;
+    expect(edits, isNotEmpty);
+    final fileEdit =
+        edits.firstWhere((edit) => edit.file == fixtureFilePath);
+    final updated =
+        SourceEdit.applySequence(resolved.unit.content, fileEdit.edits);
+
+    final importBlock = RegExp(
+      r"import 'dart:io';\n"
+      r"\n?"
+      r"import 'package:lint_hard/throws\.dart';\n"
+      r"import 'package:path/path\.dart';\n"
+      r"\n?const sortkeyOption = 'sortkey';",
+    );
+    expect(updated, matches(importBlock));
+    expect(
+      updated,
+      contains(
+        '@Throws([BadStateException])\n'
+        'void undocumentedTopLevel(',
+      ),
+    );
+    expect(updated, isNot(contains('prefiximport')));
+  });
+
+  test('fix inserts annotation after doc comment', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_doc_comment.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await _resolveFixture(fixtureFilePath);
+    final unit = resolved.unit.unit;
+    final library = resolved.library;
+    final fn = _function(unit, 'chmod');
+
+    final diagnostic = Diagnostic.forValues(
+      source: resolved.unit.libraryFragment.source,
+      offset: fn.name.offset,
+      length: fn.name.length,
+      diagnosticCode: DocumentThrownExceptions.code,
+      message: DocumentThrownExceptions.code.problemMessage,
+      correctionMessage: DocumentThrownExceptions.code.correctionMessage,
+    );
+
+    final producerContext = CorrectionProducerContext.createResolved(
+      libraryResult: library,
+      unitResult: resolved.unit,
+      diagnostic: diagnostic,
+      selectionOffset: fn.name.offset,
+      selectionLength: fn.name.length,
+    );
+    final fix = DocumentThrownExceptionsFix(context: producerContext);
+    final builder = ChangeBuilder(session: resolved.unit.session);
+    await fix.compute(builder);
+
+    final edits = builder.sourceChange.edits;
+    expect(edits, isNotEmpty);
+    final fileEdit =
+        edits.firstWhere((edit) => edit.file == fixtureFilePath);
+    final updated =
+        SourceEdit.applySequence(resolved.unit.content, fileEdit.edits);
+
+    expect(
+      updated,
+      contains(
+        '/// Sets the permissions on a file.\n'
+        '@Throws([ChModException])\n'
+        'void chmod(',
+      ),
+    );
+  });
+
   test('detects undocumented thrown types in constructors', () {
     final ctor = _constructor(unit, className: 'Sample');
     final missing = _missing(

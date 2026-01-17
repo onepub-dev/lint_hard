@@ -30,8 +30,8 @@ List<SourceEdit> documentThrownExceptionEdits(
     );
     if (missing.isEmpty) continue;
 
-    final declLineStart = lineStart(content, target.declarationOffset);
-    final indent = indentAtOffset(content, target.declarationOffset);
+    final insertOffset = _annotationInsertOffset(content, target);
+    final indent = indentAtOffset(content, insertOffset);
     final types = (missing.toList()..sort()).join(', ');
 
     final throwsAnnotation = _findThrowsAnnotation(target.metadata);
@@ -45,22 +45,21 @@ List<SourceEdit> documentThrownExceptionEdits(
         );
       } else {
         edits.add(
-          SourceEdit(declLineStart, 0, '$indent@Throws([$types])\n'),
+          SourceEdit(insertOffset, 0, '$indent@Throws([$types])\n'),
         );
       }
     } else {
-      edits.add(SourceEdit(declLineStart, 0, '$indent@Throws([$types])\n'));
+      edits.add(
+        SourceEdit(insertOffset, 0, '$indent@Throws([$types])\n'),
+      );
     }
     if (!hasImport) {
-      final insertAt = _importInsertOffset(unitResult.unit, content);
-      edits.add(
-        SourceEdit(insertAt, 0, "import 'package:lint_hard/throws.dart';\n"),
-      );
+      final insertion = _importInsertion(unitResult.unit, content);
+      edits.add(SourceEdit(insertion.offset, 0, insertion.text));
       hasImport = true;
     }
   }
 
-  edits.sort((a, b) => a.offset.compareTo(b.offset));
   return edits;
 }
 
@@ -71,6 +70,7 @@ ExecutableTarget? findExecutableTarget(AstNode node) {
       body: method.body,
       metadata: method.metadata,
       declarationOffset: method.offset,
+      documentationComment: method.documentationComment,
     );
   }
 
@@ -80,6 +80,7 @@ ExecutableTarget? findExecutableTarget(AstNode node) {
       body: ctor.body,
       metadata: ctor.metadata,
       declarationOffset: ctor.offset,
+      documentationComment: ctor.documentationComment,
     );
   }
 
@@ -89,6 +90,7 @@ ExecutableTarget? findExecutableTarget(AstNode node) {
       body: function.functionExpression.body,
       metadata: function.metadata,
       declarationOffset: function.offset,
+      documentationComment: function.documentationComment,
     );
   }
 
@@ -125,11 +127,13 @@ class ExecutableTarget {
   final FunctionBody body;
   final NodeList<Annotation>? metadata;
   final int declarationOffset;
+  final Comment? documentationComment;
 
   ExecutableTarget({
     required this.body,
     required this.metadata,
     required this.declarationOffset,
+    required this.documentationComment,
   });
 }
 
@@ -177,12 +181,154 @@ bool _hasThrowsImport(CompilationUnit unit) {
   return false;
 }
 
-int _importInsertOffset(CompilationUnit unit, String content) {
-  if (unit.directives.isEmpty) return 0;
-  final last = unit.directives.last;
-  final end = last.end;
-  final needsNewline = end < content.length && content.codeUnitAt(end) != 0x0A;
-  return needsNewline ? end + 1 : end;
+class _ImportInsertion {
+  final int offset;
+  final String text;
+
+  const _ImportInsertion(this.offset, this.text);
+}
+
+int _importGroupForUri(String uri) {
+  if (uri.startsWith('dart:')) return 0;
+  if (uri.startsWith('package:')) return 1;
+  return 2;
+}
+
+_ImportInsertion _importInsertion(CompilationUnit unit, String content) {
+  const newUri = 'package:lint_hard/throws.dart';
+  final newGroup = _importGroupForUri(newUri);
+  final imports = <_ImportInfo>[];
+  for (final directive in unit.directives) {
+    if (directive is ImportDirective) {
+      final uri = directive.uri.stringValue;
+      if (uri == null) continue;
+      imports.add(_ImportInfo(directive, uri, _importGroupForUri(uri)));
+    }
+  }
+
+  if (imports.isNotEmpty) {
+    _ImportInfo? previous;
+    for (final info in imports) {
+      final groupCmp = newGroup.compareTo(info.group);
+      if (groupCmp < 0 ||
+          (groupCmp == 0 && newUri.compareTo(info.uri) < 0)) {
+        final insertAt = (groupCmp < 0 && previous != null)
+            ? previous.directive.end
+            : info.directive.offset;
+        final text = _importText(
+          content,
+          insertAt,
+          nextGroup: info.group,
+          nextOffset: info.directive.offset,
+          newGroup: newGroup,
+        );
+        return _ImportInsertion(insertAt, text);
+      }
+      previous = info;
+    }
+
+    final insertAt = imports.last.directive.end;
+    final text = _importText(content, insertAt);
+    return _ImportInsertion(insertAt, text);
+  }
+
+  ImportDirective? lastImport;
+  LibraryDirective? library;
+  PartDirective? firstPart;
+  for (final directive in unit.directives) {
+    if (directive is ImportDirective) lastImport = directive;
+    if (directive is LibraryDirective && library == null) {
+      library = directive;
+    }
+    if (directive is PartDirective && firstPart == null) {
+      firstPart = directive;
+    }
+  }
+
+  if (lastImport != null) {
+    final insertAt = lastImport.end;
+    final text = _importText(content, insertAt);
+    return _ImportInsertion(insertAt, text);
+  }
+  if (library != null) {
+    final insertAt = library.end;
+    final text = _importText(content, insertAt);
+    return _ImportInsertion(insertAt, text);
+  }
+  if (firstPart != null) {
+    final insertAt = firstPart.offset;
+    final text = _importText(content, insertAt);
+    return _ImportInsertion(insertAt, text);
+  }
+  return _ImportInsertion(0, _importText(content, 0));
+}
+
+int _annotationInsertOffset(String content, ExecutableTarget target) {
+  final comment = target.documentationComment;
+  if (comment == null) return lineStart(content, target.declarationOffset);
+
+  var i = comment.end;
+  while (i < content.length && !_isLineBreak(content.codeUnitAt(i))) {
+    i++;
+  }
+
+  if (i < content.length && content.codeUnitAt(i) == 0x0D) {
+    i++;
+    if (i < content.length && content.codeUnitAt(i) == 0x0A) {
+      i++;
+    }
+  } else if (i < content.length && content.codeUnitAt(i) == 0x0A) {
+    i++;
+  }
+
+  return i;
+}
+
+String _importText(
+  String content,
+  int insertAt, {
+  int? nextGroup,
+  int? nextOffset,
+  int? newGroup,
+}) {
+  final needsLeadingNewline =
+      insertAt > 0 && !_isLineBreak(content.codeUnitAt(insertAt - 1));
+  final prefix = needsLeadingNewline ? '\n' : '';
+  final needsGroupSpacing = nextGroup != null &&
+      newGroup != null &&
+      nextGroup != newGroup &&
+      nextOffset != null &&
+      _lineBreakCount(content, insertAt, nextOffset) < 2;
+  final suffix = needsGroupSpacing ? '\n' : '';
+  return "${prefix}import 'package:lint_hard/throws.dart';\n$suffix";
+}
+
+bool _isLineBreak(int codeUnit) => codeUnit == 0x0A || codeUnit == 0x0D;
+
+int _lineBreakCount(String content, int start, int end) {
+  var count = 0;
+  var i = start;
+  while (i < end) {
+    final cu = content.codeUnitAt(i);
+    if (cu == 0x0A) {
+      count++;
+    } else if (cu == 0x0D) {
+      count++;
+      if (i + 1 < end && content.codeUnitAt(i + 1) == 0x0A) {
+        i++;
+      }
+    }
+    i++;
+  }
+  return count;
+}
+
+class _ImportInfo {
+  final ImportDirective directive;
+  final String uri;
+  final int group;
+
+  const _ImportInfo(this.directive, this.uri, this.group);
 }
 
 Map<String, CompilationUnit> unitsByPathFromResolvedUnits(
@@ -205,6 +351,7 @@ class _ExecutableCollector extends RecursiveAstVisitor<void> {
         body: node.body,
         metadata: node.metadata,
         declarationOffset: node.offset,
+        documentationComment: node.documentationComment,
       ),
     );
     super.visitMethodDeclaration(node);
@@ -217,6 +364,7 @@ class _ExecutableCollector extends RecursiveAstVisitor<void> {
         body: node.body,
         metadata: node.metadata,
         declarationOffset: node.offset,
+        documentationComment: node.documentationComment,
       ),
     );
     super.visitConstructorDeclaration(node);
@@ -230,6 +378,7 @@ class _ExecutableCollector extends RecursiveAstVisitor<void> {
           body: node.functionExpression.body,
           metadata: node.metadata,
           declarationOffset: node.offset,
+          documentationComment: node.documentationComment,
         ),
       );
     }
