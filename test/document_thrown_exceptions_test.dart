@@ -12,6 +12,7 @@ import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dar
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:lint_hard/src/document_thrown_exceptions.dart';
 import 'package:lint_hard/src/document_thrown_exceptions_fix.dart';
+import 'package:lint_hard/src/document_thrown_exceptions_fix_utils.dart';
 import 'package:lint_hard/src/throws_cache.dart';
 import 'package:lint_hard/src/throws_cache_lookup.dart';
 import 'package:test/test.dart';
@@ -584,6 +585,52 @@ void main() {
     );
   });
 
+  test('fix --source adds provenance for external throws', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_provenance.dart';
+    final resolved = await _resolveFixture(File(fixturePath).absolute.path);
+
+    final edits = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      externalLookup: _ProvenanceThrowsCacheLookup(),
+      includeSource: true,
+    );
+    expect(edits, isNotEmpty);
+    edits.sort((a, b) => b.offset.compareTo(a.offset));
+
+    final updated = SourceEdit.applySequence(
+      resolved.unit.content,
+      edits,
+    );
+
+    final callPattern =
+        r"@Throws\(FormatException, call: 'dart:core\|RegExp#RegExp(?:\.new)?\(String,bool,bool,bool,bool\):\d+'";
+    expect(updated, matches(RegExp(callPattern)));
+    expect(updated, contains("origin: 'dart:core|RegExp#RegExp():999'"));
+  });
+
+  test('fix --source preserves reason without provenance', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_reason_source.dart';
+    final resolved = await _resolveFixture(File(fixturePath).absolute.path);
+
+    final edits = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      includeSource: true,
+    );
+    expect(edits, isNotEmpty);
+    edits.sort((a, b) => b.offset.compareTo(a.offset));
+
+    final updated = SourceEdit.applySequence(
+      resolved.unit.content,
+      edits,
+    );
+    final reasonPattern = "@Throws\\(BadStateException, reason: 'bad'\\)";
+    expect(RegExp(reasonPattern).allMatches(updated).length, 1);
+  });
+
   test('detects undocumented thrown types in constructors', () {
     final ctor = _constructor(unit, className: 'Sample');
     final missing = _missing(
@@ -767,6 +814,39 @@ class _TestThrowsCacheLookup extends ThrowsCacheLookup {
         element is ConstructorElement &&
         element.enclosingElement.name == 'RegExp') {
       return const [CachedThrownType('FormatException')];
+    }
+    return const <CachedThrownType>[];
+  }
+}
+
+class _ProvenanceThrowsCacheLookup extends ThrowsCacheLookup {
+  _ProvenanceThrowsCacheLookup()
+    : super(
+        cache: ThrowsCache(Directory.systemTemp.path),
+        packageVersions: const {},
+        packageSources: const {},
+        sdkVersion: 'test',
+        sdkRoot: null,
+        flutterVersion: null,
+      );
+
+  @override
+  List<CachedThrownType> lookupWithProvenance(ExecutableElement element) {
+    final uri = element.library.firstFragment.source.uri.toString();
+    if (uri == 'dart:core' &&
+        element is ConstructorElement &&
+        element.enclosingElement.name == 'RegExp') {
+      return const [
+        CachedThrownType(
+          'FormatException',
+          provenance: [
+            ThrowsProvenance(
+              call: 'dart:core|RegExp#RegExp():10',
+              origin: 'dart:core|RegExp#RegExp():999',
+            ),
+          ],
+        ),
+      ];
     }
     return const <CachedThrownType>[];
   }

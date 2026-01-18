@@ -7,6 +7,7 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
+import 'package:lint_hard/src/throws_cache.dart';
 import 'package:lint_hard/src/throws_cache_indexer.dart';
 import 'package:lint_hard/src/throws_cache_writer.dart';
 import 'package:lint_hard/src/version/version.g.dart';

@@ -1,0 +1,3 @@
+void usesRegExp() {
+  RegExp('[');
+}
