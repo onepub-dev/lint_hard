@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:path/path.dart' as p;
 
@@ -22,18 +23,24 @@ List<SourceEdit> documentThrownExceptionEdits(
   final edits = <SourceEdit>[];
   var hasImport = _hasThrowsImport(unitResult.unit);
   for (final target in collector.targets) {
-    final missing = missingThrownTypeDocs(
+    final missingInfos = missingThrownTypeInfos(
       target.body,
       target.metadata,
       unitsByPath: unitsByPath,
       externalLookup: externalLookup,
     );
-    if (missing.isEmpty) continue;
+    if (missingInfos.isEmpty) continue;
 
     final insertOffset = _annotationInsertOffset(content, target);
     final indent = indentAtOffset(content, target.declarationOffset);
-    final sortedMissing = missing.toList()..sort();
-    final lines = [for (final type in sortedMissing) '@Throws($type)'];
+    final libraryUri = unitResult.libraryFragment.source.uri.toString();
+    final importData = _collectImportPrefixes(unitResult.unit);
+    final sortedMissing = missingInfos.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    final lines = [
+      for (final info in sortedMissing)
+        '@Throws(${_formatThrownType(info, importData, libraryUri)})',
+    ];
     edits.add(
       SourceEdit(insertOffset, 0, '$indent${lines.join("\n$indent")}\n'),
     );
@@ -289,6 +296,96 @@ int _lineBreakCount(String content, int start, int end) {
     i++;
   }
   return count;
+}
+
+class _ImportPrefixData {
+  final Map<String, String> prefixed;
+  final Set<String> unprefixed;
+  final Map<String, String> prefixedPackages;
+  final Set<String> unprefixedPackages;
+
+  const _ImportPrefixData(
+    this.prefixed,
+    this.unprefixed,
+    this.prefixedPackages,
+    this.unprefixedPackages,
+  );
+}
+
+_ImportPrefixData _collectImportPrefixes(CompilationUnit unit) {
+  final prefixed = <String, String>{};
+  final unprefixed = <String>{};
+  final prefixedPackages = <String, String>{};
+  final unprefixedPackages = <String>{};
+  for (final directive in unit.directives) {
+    if (directive is! ImportDirective) continue;
+    final uri = directive.uri.stringValue;
+    if (uri == null || uri.isEmpty) continue;
+    final prefix = directive.prefix?.name;
+    final package = _packageName(uri);
+    if (prefix != null && prefix.isNotEmpty) {
+      prefixed[uri] = prefix;
+      if (package != null && package.isNotEmpty) {
+        prefixedPackages.putIfAbsent(package, () => prefix);
+      }
+    } else {
+      unprefixed.add(uri);
+      if (package != null && package.isNotEmpty) {
+        unprefixedPackages.add(package);
+      }
+    }
+  }
+  return _ImportPrefixData(
+    prefixed,
+    unprefixed,
+    prefixedPackages,
+    unprefixedPackages,
+  );
+}
+
+String _formatThrownType(
+  ThrownTypeInfo info,
+  _ImportPrefixData importData,
+  String libraryUri,
+) {
+  final typeUri = _libraryUriForType(info.type);
+  if (typeUri == null || typeUri == libraryUri) {
+    return info.name;
+  }
+  if (importData.unprefixed.contains(typeUri)) {
+    return info.name;
+  }
+  final prefix = importData.prefixed[typeUri];
+  if (prefix != null && prefix.isNotEmpty) {
+    return '$prefix.${info.name}';
+  }
+  final typePackage = _packageName(typeUri);
+  if (typePackage != null) {
+    if (importData.unprefixedPackages.contains(typePackage)) {
+      return info.name;
+    }
+    final packagePrefix = importData.prefixedPackages[typePackage];
+    if (packagePrefix != null && packagePrefix.isNotEmpty) {
+      return '$packagePrefix.${info.name}';
+    }
+  }
+  return info.name;
+}
+
+String? _libraryUriForType(DartType? type) {
+  if (type is InterfaceType) {
+    final uri = type.element.library.firstFragment.source.uri;
+    return uri.toString();
+  }
+  return null;
+}
+
+String? _packageName(String uri) {
+  if (!uri.startsWith('package:')) return null;
+  final trimmed = uri.substring('package:'.length);
+  final slash = trimmed.indexOf('/');
+  if (slash == -1) return trimmed;
+  return trimmed.substring(0, slash);
 }
 
 class _ImportInfo {

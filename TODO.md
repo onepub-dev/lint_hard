@@ -59,7 +59,7 @@ extension so that these are show. Can we get the ide teams to support our annota
 - [x] index tool needs to index the flutter sdk.
 
 
-- [] if an exception listed in the @Throws declaration is from an alised import
+- [x] if an exception listed in the @Throws declaration is from an alised import
 then the lint fix commend generates an error as the exception is unkown due to the 
 missing alias prefix. 
 ```
@@ -79,6 +79,10 @@ class MyYaml {
   }
   ```
   YamlException needs to be written as y.YamlException.
+
+  - [] The index format duplicates the offsets in teh footer. However the data_offset isn't duplicated. 
+  The Data record describes the thrown_type_string_offest as 4*M without defining M. The same goes for the String Tab (K).
+
 
  - [] move the throws lint and associated tooling into its own package document_throws.
  the @Throws annotation should be placed in its own package as its needed for 

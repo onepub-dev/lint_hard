@@ -438,6 +438,52 @@ void main() {
     expect(updated, contains('@Throws(BadStateException)'));
   });
 
+  test('fix prefixes throws types for aliased imports', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_prefixed.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await _resolveFixture(fixtureFilePath);
+    final unit = resolved.unit.unit;
+    final library = resolved.library;
+    final fn = _function(unit, 'undocumentedPrefixed');
+
+    final diagnostic = Diagnostic.forValues(
+      source: resolved.unit.libraryFragment.source,
+      offset: fn.name.offset,
+      length: fn.name.length,
+      diagnosticCode: DocumentThrownExceptions.code,
+      message: DocumentThrownExceptions.code.problemMessage,
+      correctionMessage: DocumentThrownExceptions.code.correctionMessage,
+    );
+
+    final producerContext = CorrectionProducerContext.createResolved(
+      libraryResult: library,
+      unitResult: resolved.unit,
+      diagnostic: diagnostic,
+      selectionOffset: fn.name.offset,
+      selectionLength: fn.name.length,
+    );
+    final fix = DocumentThrownExceptionsFix(context: producerContext);
+    final builder = ChangeBuilder(session: resolved.unit.session);
+    await fix.compute(builder);
+
+    final edits = builder.sourceChange.edits;
+    expect(edits, isNotEmpty);
+    final fileEdit =
+        edits.firstWhere((edit) => edit.file == fixtureFilePath);
+    final updated =
+        SourceEdit.applySequence(resolved.unit.content, fileEdit.edits);
+
+    expect(
+      updated,
+      contains(
+        "import 'package:lint_hard/throws.dart';\n"
+        "import 'package:yaml/yaml.dart' as y;\n",
+      ),
+    );
+    expect(updated, contains('@Throws(y.YamlException)\n'));
+  });
+
   test('fix keeps import and annotation formatting', () async {
     final fixturePath =
         'test/fixtures/document_thrown_exceptions_with_imports.dart';

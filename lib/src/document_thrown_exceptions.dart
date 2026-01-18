@@ -134,7 +134,7 @@ _ThrownTypeResults _collectThrownTypes(
 
 class _ThrownTypeResults {
   final Set<String> types;
-  final List<_ThrownTypeInfo> infos;
+  final List<ThrownTypeInfo> infos;
   final bool sawThrowExpression;
   final bool sawUnknownThrowExpression;
 
@@ -154,6 +154,23 @@ Set<String> missingThrownTypeDocs(
   Map<String, CompilationUnit>? unitsByPath,
   ThrowsCacheLookup? externalLookup,
 }) {
+  final missing = missingThrownTypeInfos(
+    body,
+    metadata,
+    allowSourceFallback: allowSourceFallback,
+    unitsByPath: unitsByPath,
+    externalLookup: externalLookup,
+  );
+  return {for (final info in missing) info.name};
+}
+
+List<ThrownTypeInfo> missingThrownTypeInfos(
+  FunctionBody body,
+  NodeList<Annotation>? metadata, {
+  bool allowSourceFallback = false,
+  Map<String, CompilationUnit>? unitsByPath,
+  ThrowsCacheLookup? externalLookup,
+}) {
   // Prefer AST; optionally fallback to source parsing for edge cases.
   final thrownResults = _collectThrownTypes(
     body,
@@ -167,11 +184,27 @@ Set<String> missingThrownTypeDocs(
           !thrownResults.sawThrowExpression)) {
     thrownTypes.addAll(_collectThrownTypesFromSource(body.toSource()));
   }
-  if (thrownTypes.isEmpty) return <String>{};
+  if (thrownTypes.isEmpty) return const <ThrownTypeInfo>[];
 
   final documented = _annotationThrownTypes(metadata);
-  final missing = thrownTypes.where((t) => !documented.contains(t));
-  return missing.toSet();
+  final byName = <String, ThrownTypeInfo>{};
+  for (final info in thrownResults.infos) {
+    final existing = byName[info.name];
+    if (existing == null || (existing.type == null && info.type != null)) {
+      byName[info.name] = info;
+    }
+  }
+  for (final name in thrownTypes) {
+    byName.putIfAbsent(name, () => ThrownTypeInfo(name, null));
+  }
+
+  final missing = <ThrownTypeInfo>[];
+  for (final entry in byName.entries) {
+    if (!documented.contains(entry.key)) {
+      missing.add(entry.value);
+    }
+  }
+  return missing;
 }
 
 Set<String> collectThrownTypeNames(
@@ -208,7 +241,7 @@ Set<String> _annotationThrownTypes(NodeList<Annotation>? metadata) {
     final args = annotation.arguments?.arguments;
     if (args == null || args.isEmpty) continue;
     final first = args.first;
-    if (first is! Expression || first is ListLiteral) continue;
+    if (first is ListLiteral) continue;
     final normalized = _extractThrowTypeName(first);
     if (normalized != null) {
       types.add(normalized);
@@ -228,16 +261,16 @@ String? _extractThrowTypeName(Expression expression) {
   return _normalizeTypeName(expression.toSource());
 }
 
-class _ThrownTypeInfo {
+class ThrownTypeInfo {
   final String name;
   final DartType? type;
 
-  const _ThrownTypeInfo(this.name, this.type);
+  const ThrownTypeInfo(this.name, this.type);
 }
 
 class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
   final _ThrownTypeResolver? _resolver;
-  final List<_ThrownTypeInfo> _thrown = [];
+  final List<ThrownTypeInfo> _thrown = [];
   final Set<String> thrownTypes = <String>{};
   bool sawThrowExpression = false;
   int _unknownThrowCount = 0;
@@ -311,7 +344,7 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
     node.finallyBlock?.accept(this);
   }
 
-  void _recordThrow(_ThrownTypeInfo info) {
+  void _recordThrow(ThrownTypeInfo info) {
     _thrown.add(info);
     thrownTypes.add(info.name);
   }
@@ -325,7 +358,7 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
   }
 
   bool _isCaughtWithoutRethrow(
-    _ThrownTypeInfo info,
+    ThrownTypeInfo info,
     NodeList<CatchClause> catchClauses,
   ) {
     for (final clause in catchClauses) {
@@ -336,7 +369,7 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
     return false;
   }
 
-  bool _catchMatches(_ThrownTypeInfo info, CatchClause clause) {
+  bool _catchMatches(ThrownTypeInfo info, CatchClause clause) {
     final exceptionType = clause.exceptionType;
     if (exceptionType == null) return true;
 
@@ -411,12 +444,12 @@ class _RethrowFinder extends RecursiveAstVisitor<void> {
 }
 
 // Normalize a thrown expression into a type name and type, if available.
-_ThrownTypeInfo? _thrownTypeFromExpression(Expression expression) {
+ThrownTypeInfo? _thrownTypeFromExpression(Expression expression) {
   if (expression is InstanceCreationExpression) {
     final typeName = expression.constructorName.type.name.lexeme;
     final normalized = _normalizeTypeName(typeName);
     if (normalized == null) return null;
-    return _ThrownTypeInfo(normalized, expression.staticType);
+    return ThrownTypeInfo(normalized, expression.staticType);
   }
 
   final staticType = expression.staticType;
@@ -425,7 +458,7 @@ _ThrownTypeInfo? _thrownTypeFromExpression(Expression expression) {
   final displayName = staticType.getDisplayString();
   final normalized = _normalizeTypeName(displayName);
   if (normalized == null) return null;
-  return _ThrownTypeInfo(normalized, staticType);
+  return ThrownTypeInfo(normalized, staticType);
 }
 
 // Strip generics/qualifiers and drop non-specific types.
@@ -476,19 +509,19 @@ String? _catchTypeName(TypeAnnotation exceptionType) {
 class _ThrownTypeResolver {
   final Map<String, CompilationUnit> _unitsByPath;
   final ThrowsCacheLookup? _externalLookup;
-  final Map<ExecutableElement, List<_ThrownTypeInfo>> _cache = {};
+  final Map<ExecutableElement, List<ThrownTypeInfo>> _cache = {};
   final Set<ExecutableElement> _inProgress = {};
 
   _ThrownTypeResolver(this._unitsByPath, {ThrowsCacheLookup? externalLookup})
     : _externalLookup = externalLookup;
 
-  List<_ThrownTypeInfo> thrownTypesForExecutable(ExecutableElement element) {
+  List<ThrownTypeInfo> thrownTypesForExecutable(ExecutableElement element) {
     final cached = _cache[element];
     if (cached != null) return cached;
-    if (_inProgress.contains(element)) return const <_ThrownTypeInfo>[];
+    if (_inProgress.contains(element)) return const <ThrownTypeInfo>[];
     _inProgress.add(element);
 
-    final infos = <_ThrownTypeInfo>[];
+    final infos = <ThrownTypeInfo>[];
     final fragment = element.firstFragment;
 
     final unit = _unitForFragment(fragment);
@@ -498,10 +531,7 @@ class _ThrownTypeResolver {
       if (execNode != null) {
         final body = execNode.body;
         if (body != null) {
-          final thrownResults = _collectThrownTypes(
-            body,
-            resolver: this,
-          );
+          final thrownResults = _collectThrownTypes(body, resolver: this);
           infos.addAll(thrownResults.infos);
         }
       }
@@ -509,7 +539,7 @@ class _ThrownTypeResolver {
     if (unit == null) {
       final cached = _externalLookup?.lookup(element) ?? const <String>[];
       for (final name in cached) {
-        infos.add(_ThrownTypeInfo(name, null));
+        infos.add(ThrownTypeInfo(name, null));
       }
     }
 
