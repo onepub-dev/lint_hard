@@ -7,18 +7,16 @@ Lint Hard employs strong mode type saftey to improve code clarity and remove 'am
 
 Lint Hard turns many of the common runtime errors into compile time errors. The rule of thumb is that it is 10 times harder to fix a runtime error than a compiler error. Lint Hard will save you time and frustration.  
 
-Using Lint Hard will require you to do a little more work as you code but will significantly reduce runtime errors saving far more time than you will spend cleaning your lints. The `dart fix` command also automates fixing many of the most common lints reducing the workload.
+Using Lint Hard will require you to do a little more work as you code but will significantly reduce runtime errors, saving far more time than you will spend cleaning your lints. The `dart fix` command also automates fixing many of the most common lints reducing the workload.
 
 Lint Hard forces you to use consistent standards across your code base which makes it easier for other developers to read your code. It will also help when you come back to your code in 12 months time.
-
-Style note: please avoid emojis in docs and issues, and use bullet lists sparingly.
 
 ## drop in replacement
 You can use Lint Hard as a drop in replacement for your existing lint package (pedantic, lints, flutter_lints ...).
 
 
 ## what lints are included
-Lint Hard includes every non-clashing dart lint and enables strong mode type checks.
+Lint Hard includes every non-clashing dart lint and enables strong mode type checks. We do remove a few lints that make little sense given our objectives.
 
 ```yaml
 analyzer:
@@ -35,42 +33,66 @@ You can see the full set of lints in the analysis_options.yaml file.
 
 ## installing Lint Hard
 
-To install lint_hard into your app or package:
-
 1. Check in any existing code changes.
-
-2. run dart format
-
-    ```terminal
-    dart format
-    ```
-3. Check in the formatted code
-
-    If you already use dart format you can skip this step.
-    If you don't currently use dart format this step will make it easier to diff your lint changes as they won't be mingled with format changes.
-    
-4.  In a terminal, located at the root of your package, run this command:
+2. Run `dart format` and check in the formatting changes.
+3. Add the package:
 
     ```terminal
     dart pub add --dev lint_hard
     ```
 
-5.  Create or modify the `analysis_options.yaml` file in the root of your project:
+4. Create or modify `analysis_options.yaml`:
 
     ```yaml
     include: package:lint_hard/all.yaml
-    # enable lint hards custom lints - these do add a performance overhead.
+    # enable lint_hard custom lints - these add a performance overhead of 
+    # about 20 seconds to the first run of dart analyze
     plugins:
       lint_hard:
-        path: ..
-        diagnostics:
-          document_thrown_exceptions: true
-          fields_first_constructors_next: true
     ```
+
+5. Remove any existing lint packages (lints, pedantic, flutter_lints) from
+your `pubspec.yaml` and `analysis_options.yaml`.
+6. Run `dart pub get`
+7. Run `dart fix --apply` until it reports "Nothing to fix!".
+8. Run `dart format` again if needed.
+9. Restart the Dart analysis server in your IDE.
+
+## Manually fixing lints
+The `dart fix` command will not fix all of your lints, so you now need to 
+work through the remaing lints by hand.
+
+This can be a bit overwhelming to begin with, so I recommend a couple of 
+approaches.
+Filter the list of warnings (most IDEs allow this) and focus on fixing
+one type of lint at a time.
+If you can't fix all of the lints immediately you can temporarily disable
+some lints via adding a rule to your `analysis_options.yaml`.
+Remember to go back and re-enable them as you slow work through the full
+set of lints.
+
+Don't get discourage once you have fixed all of your lints, new warnings
+will be fewer and easier to fix.
+
+e.g.
+```yaml
+linter:
+  rules:
+    avoid_print: false
+```
+
+## Consle app development
+For console apps that use `print`, add this to `analysis_options.yaml`:
+
+```yaml
+linter:
+  rules:
+    avoid_print: false
+```
 
 ## documenting thrown exceptions
 
-The `document_thrown_exceptions` lint uses the `@Throws` annotation from this package.
+The `document_thrown_exceptions` lint uses the `@Throws` annotation.
 
 Example:
 
@@ -88,35 +110,17 @@ void parseWithReason(String value) {
 }
 ```
 
-5. Remove your existing linter
+Build the external throws cache once per SDK or package update:
 
-    If you are using another linter such as lints, pedantic, flutter_lints etc. now is the time to remove it.
-    Your existing lint package should be listed in the dev_dependencies section of your projects pubspec.yaml.
-    
-    If you have been using the pedantic package it may be in the dependencies section. Remove it also.
-    
-5. run dart fix
+```terminal
+lint_hard_index
+```
 
-    The dart fix command will apply a number of automated fixes based on the lint_hard settings.
+Use `--no-sdk`, `--no-packages`, or `--no-flutter` to limit indexing.
 
-    Run:
-    ```bash
-    dart fix --apply
-    ```
-    Re-run dart fix until it reports 'Nothing to fix!'
-
-6. run dart format
-
-    Finally run `dart format` over your code. Ideally you should be using an IDE that automatically formats your code whenever you save.
-    
-7. avoid_print for console users
-
-    Console apps developers should add the following to your project's analysis_options.yaml
-    ```
-    linter:
-      rules:
-        avoid_print: false  
-    ```
+In VS Code you can view `@Throws` annotations using Peek Definition:
+right-click the function name and select "Peek Definition", or press
+`Alt+F12` with the caret on the symbol.
 
 ## other improvements
 
@@ -176,8 +180,8 @@ Use techniques such as default values and (carefully) the `late` keyword.
 ## customizing the predefined lint sets
 
 You can customize the predefined lint set, both to disable a
-lint or to add additional lints. For details see [customizing static
-analysis].
+lint or to add additional lints. For details see
+[customizing static analysis](https://dart.dev/tools/analysis#configuring-the-analyzer).
 
 
 # Updating lint_hard

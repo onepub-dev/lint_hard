@@ -83,6 +83,10 @@ class MyYaml {
   - [] The index format duplicates the offsets in teh footer. However the data_offset isn't duplicated. 
   The Data record describes the thrown_type_string_offest as 4*M without defining M. The same goes for the String Tab (K).
 
+  Provide better examples of how the string table is used.
+  Provide an explaination of what a <container> is in the Keys section, 
+  don't use RegEx as an example. 
+
 
  - [] move the throws lint and associated tooling into its own package document_throws.
  the @Throws annotation should be placed in its own package as its needed for 
@@ -93,7 +97,7 @@ class MyYaml {
  also resets our indicies - can we safely store index in the existing package
  directory?
 
- - [] document the use of 'peek definition' in vs-code to see the annotations.
+ - [x] document the use of 'peek definition' in vs-code to see the annotations.
 
   - [] When a library is a 'part of' another library the imports have to be
   placed in the part library. Currently we place them in the 'part of' library
