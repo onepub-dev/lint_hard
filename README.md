@@ -1,6 +1,6 @@
-# lint_hard workspace
+# lint_hard repo
 
-This repository is a Dart workspace containing:
+This repository contains two packages:
 
-- `packages/lint_hard`
-- `packages/document_throws`
+- `lint_hard/`
+- `document_throws/`

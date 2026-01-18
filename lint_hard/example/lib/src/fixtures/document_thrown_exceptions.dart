@@ -1,4 +1,5 @@
-import 'package:lint_hard/throws.dart';
+import 'package:lint_hard/lint_hard.dart';
+
 class BadStateException implements Exception {}
 
 class Thrower {
