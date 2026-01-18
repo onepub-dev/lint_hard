@@ -24,7 +24,13 @@ Suggested provenance fields:
 
 Provenance is always stored during indexing.
 
-The 'call' site uses the full executable key so it is unambiguous.
+The cache stores the full executable key for provenance.
+
+The fix tool shortens the provenance strings for annotations:
+- Use the package name or `dart:<library>` as the source prefix.
+- Omit package versions, file paths, and repository types.
+- Drop parameter lists from the executable name.
+- File URIs are normalized to the package name from the cache path.
 
 The origin is only output when it differs from the call.
 
@@ -49,6 +55,13 @@ package:foo/bar.dart|Foo#baz(int,String):123
 ```
 
 Line numbers are not included for local (project) provenance.
+
+Annotation output uses shortened keys:
+
+```
+foo|baz
+dart:io|writeAsString
+```
 
 ## Provenance Rules
 - Local project code is not indexed. Provenance is still recorded when a local
@@ -78,17 +91,17 @@ No enum. Use additional optional args in `@Throws`:
 ```
 
 ## Fix Tool Behavior
-- `document_throws_fix` uses `--source` to include provenance fields.
-- Without `--source`, annotations are written without provenance.
-- When `--source` is used and provenance exists, the fix updates annotations
+- `document_throws_fix` uses `--origin` to include provenance fields.
+- Without `--origin`, annotations are written without provenance.
+- When `--origin` is used and provenance exists, the fix updates annotations
   to include `call` and `origin`.
   It prints a reminder that provenance can be removed by re-running the fix
-  without `--source`.
+  without `--origin`.
 
 ## Removal Path
 To remove provenance from code:
 1. Remove existing `@Throws` annotations.
-2. Re-run the fix tool without `--source`.
+2. Re-run the fix tool without `--origin`.
 
 ## Open Questions
 - Provenance string size limits and compression.

@@ -135,6 +135,95 @@ class ProvenanceThrowsCacheLookup extends ThrowsCacheLookup {
   }
 }
 
+class PrefixedThrowsCacheLookup extends ThrowsCacheLookup {
+  PrefixedThrowsCacheLookup()
+    : super(
+        cache: ThrowsCache(Directory.systemTemp.path),
+        packageVersions: const {},
+        packageSources: const {},
+        sdkVersion: 'test',
+        sdkRoot: null,
+        flutterVersion: null,
+      );
+
+  @override
+  List<CachedThrownType> lookupWithProvenance(ExecutableElement element) {
+    final uri = element.library.firstFragment.source.uri.toString();
+    if (uri == 'package:yaml/yaml.dart' && element.name == 'loadYaml') {
+      return const [CachedThrownType('YamlException')];
+    }
+    return const <CachedThrownType>[];
+  }
+}
+
+class FilePathProvenanceLookup extends ThrowsCacheLookup {
+  FilePathProvenanceLookup()
+    : super(
+        cache: ThrowsCache(Directory.systemTemp.path),
+        packageVersions: const {},
+        packageSources: const {},
+        sdkVersion: 'test',
+        sdkRoot: null,
+        flutterVersion: null,
+      );
+
+  @override
+  List<CachedThrownType> lookupWithProvenance(ExecutableElement element) {
+    final uri = element.library.firstFragment.source.uri.toString();
+    if (uri == 'dart:core' &&
+        element is ConstructorElement &&
+        element.enclosingElement.name == 'RegExp') {
+      return const [
+        CachedThrownType(
+          'FormatException',
+          provenance: [
+            ThrowsProvenance(
+              call: 'dart:core|RegExp#RegExp():10',
+              origin:
+                  'file:///home/bsutton/.pub-cache/hosted/pub.dev/posix-6.0.3/lib/src/pwd.dart|_buildPasswd',
+            ),
+          ],
+        ),
+      ];
+    }
+    return const <CachedThrownType>[];
+  }
+}
+
+class LongProvenanceLookup extends ThrowsCacheLookup {
+  LongProvenanceLookup()
+    : super(
+        cache: ThrowsCache(Directory.systemTemp.path),
+        packageVersions: const {},
+        packageSources: const {},
+        sdkVersion: 'test',
+        sdkRoot: null,
+        flutterVersion: null,
+      );
+
+  @override
+  List<CachedThrownType> lookupWithProvenance(ExecutableElement element) {
+    final uri = element.library.firstFragment.source.uri.toString();
+    if (uri == 'dart:core' &&
+        element is ConstructorElement &&
+        element.enclosingElement.name == 'RegExp') {
+      return const [
+        CachedThrownType(
+          'FormatException',
+          provenance: [
+            ThrowsProvenance(
+              call: 'package:very_long_package_name/src/long_path.dart|VeryLongClassName#veryLongMethodName(int,String,Map<String,String>)',
+              origin:
+                  'package:very_long_package_name/src/other_path.dart|VeryLongClassName#veryLongOriginMethodName(int,String,Map<String,String>)',
+            ),
+          ],
+        ),
+      ];
+    }
+    return const <CachedThrownType>[];
+  }
+}
+
 class _MethodFinder extends RecursiveAstVisitor<void> {
   final String name;
   MethodDeclaration? found;

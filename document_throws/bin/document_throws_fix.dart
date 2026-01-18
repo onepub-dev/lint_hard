@@ -23,14 +23,14 @@ Future<void> main(List<String> args) async {
   stdout.writeln('document_throws_fix $packageVersion');
 
   final root = Directory.current.path;
-  final includeSource = args.contains('--source');
+  final includeSource = args.contains('--origin');
   final patterns = args.where((arg) => !arg.startsWith('-')).toList();
   if (includeSource) {
     stdout.writeln(
-      'Including provenance in @Throws annotations (--source).',
+      'Including provenance in @Throws annotations (--origin).',
     );
     stdout.writeln(
-      'To remove provenance, rerun document_throws_fix without --source after '
+      'To remove provenance, rerun document_throws_fix without --origin after '
       'removing existing @Throws annotations.',
     );
   }
@@ -158,13 +158,13 @@ Future<ResolvedLibraryResult?> _resolvedLibraryForFile(
 void _printUsage() {
   stdout.writeln('Apply document_throws fixes to Dart files.');
   stdout.writeln('');
-  stdout.writeln('Usage: document_throws_fix [--source] [<glob> ...]');
+  stdout.writeln('Usage: document_throws_fix [--origin] [<glob> ...]');
   stdout.writeln('');
   stdout.writeln('If no globs are provided, all .dart files under the');
   stdout.writeln('current directory are processed.');
   stdout.writeln('');
   stdout.writeln('Options:');
-  stdout.writeln('  --source  Include call/origin provenance in @Throws.');
+  stdout.writeln('  --origin  Include call/origin provenance in @Throws.');
   stdout.writeln('');
   stdout.writeln('Examples:');
   stdout.writeln("  document_throws_fix 'lib/**/*.dart'");

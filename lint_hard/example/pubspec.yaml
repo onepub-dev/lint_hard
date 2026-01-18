@@ -8,3 +8,4 @@ dev_dependencies:
   document_throws: ^0.1.0
   lint_hard: 
     path: ..
+  throws_annotations: ^0.1.0

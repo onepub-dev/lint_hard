@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:path/path.dart' as p;
@@ -26,7 +27,9 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
   final importTarget = _importTargetUnit(unitResult, libraryUnits);
   var hasImport = _hasThrowsImport(importTarget.unit);
   for (final target in collector.targets) {
-    final thrownInfos = includeSource
+    final needsProvenanceCleanup =
+        !includeSource && _hasProvenanceAnnotations(target.metadata);
+    final thrownInfos = includeSource || needsProvenanceCleanup
         ? _mergeThrownInfos(
             collectThrownTypeInfos(
               target.body,
@@ -36,10 +39,10 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
           )
         : missingThrownTypeInfos(
             target.body,
-      target.metadata,
-      unitsByPath: unitsByPath,
-      externalLookup: externalLookup,
-    );
+            target.metadata,
+            unitsByPath: unitsByPath,
+            externalLookup: externalLookup,
+          );
     if (thrownInfos.isEmpty) continue;
 
     final insertOffset = _annotationInsertOffset(content, target);
@@ -48,10 +51,10 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
     final importData = _collectImportPrefixes(importTarget.unit);
     final sortedMissing = thrownInfos.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
-    final reasonByType = includeSource
+    final reasonByType = includeSource || needsProvenanceCleanup
         ? _annotationReasonByType(target.metadata)
         : const <String, String>{};
-    if (includeSource) {
+    if (includeSource || needsProvenanceCleanup) {
       _addEdits(
         editsByPath,
         unitResult.path,
@@ -71,6 +74,7 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
           libraryUri,
           includeSource: includeSource,
           reasonSource: reasonByType[info.name],
+          unit: importTarget.unit,
         ),
       );
     }
@@ -224,7 +228,29 @@ bool _hasThrowsImport(CompilationUnit unit) {
   for (final directive in unit.directives) {
     if (directive is ImportDirective &&
         directive.uri.stringValue ==
-            'package:document_throws/document_throws.dart') {
+            'package:throws_annotations/throws_annotations.dart') {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool _hasProvenanceAnnotations(NodeList<Annotation>? metadata) {
+  if (metadata == null || metadata.isEmpty) return false;
+  for (final annotation in metadata) {
+    if (_annotationName(annotation) != 'Throws') continue;
+    if (_annotationHasProvenance(annotation)) return true;
+  }
+  return false;
+}
+
+bool _annotationHasProvenance(Annotation annotation) {
+  final arguments = annotation.arguments?.arguments;
+  if (arguments == null) return false;
+  for (final argument in arguments) {
+    if (argument is! NamedExpression) continue;
+    final name = argument.name.label.name;
+    if (name == 'call' || name == 'origin') {
       return true;
     }
   }
@@ -245,7 +271,7 @@ int _importGroupForUri(String uri) {
 }
 
 _ImportInsertion _importInsertion(CompilationUnit unit, String content) {
-  const newUri = 'package:document_throws/document_throws.dart';
+  const newUri = 'package:throws_annotations/throws_annotations.dart';
   final newGroup = _importGroupForUri(newUri);
   final imports = <_ImportInfo>[];
   for (final directive in unit.directives) {
@@ -445,7 +471,7 @@ String _importText(
       nextOffset != null &&
       _lineBreakCount(content, insertAt, nextOffset) < 2;
   final suffix = needsGroupSpacing ? '\n' : '';
-  return "${prefix}import 'package:document_throws/document_throws.dart';\n$suffix";
+  return "${prefix}import 'package:throws_annotations/throws_annotations.dart';\n$suffix";
 }
 
 bool _isLineBreak(int codeUnit) => codeUnit == 0x0A || codeUnit == 0x0D;
@@ -536,27 +562,31 @@ List<String> _formatThrownAnnotations(
   String libraryUri, {
   required bool includeSource,
   String? reasonSource,
+  required CompilationUnit unit,
 }) {
-  final renderedType = _formatThrownType(info, importData, libraryUri);
+  final renderedType = _formatThrownType(
+    info,
+    importData,
+    libraryUri,
+    unit,
+  );
   if (!includeSource || info.provenance.isEmpty) {
-    if (reasonSource == null) {
-      return ['@Throws($renderedType)'];
+    final args = <String>[renderedType];
+    if (reasonSource != null) {
+      args.add('reason: $reasonSource');
     }
-    return ['@Throws($renderedType, reason: $reasonSource)'];
+    return _renderThrowsAnnotation(args);
   }
   final lines = <String>[];
   for (final provenance in info.provenance) {
-    final buffer = StringBuffer(renderedType);
-    if (reasonSource != null) {
-      buffer.write(', reason: $reasonSource');
-    }
-    buffer.write(", call: '${_escapeSourceString(_shortenSource(provenance.call))}'");
-    if (provenance.origin != null) {
-      buffer.write(
-        ", origin: '${_escapeSourceString(_shortenSource(provenance.origin!))}'",
-      );
-    }
-    lines.add('@Throws($buffer)');
+    final args = <String>[
+      renderedType,
+      if (reasonSource != null) 'reason: $reasonSource',
+      "call: '${_escapeSourceString(_shortenSource(provenance.call))}'",
+      if (provenance.origin != null)
+        "origin: '${_escapeSourceString(_shortenSource(provenance.origin!))}'",
+    ];
+    lines.addAll(_renderThrowsAnnotation(args));
   }
   return lines;
 }
@@ -565,8 +595,10 @@ String _formatThrownType(
   ThrownTypeInfo info,
   _ImportPrefixData importData,
   String libraryUri,
+  CompilationUnit unit,
 ) {
-  final typeUri = _libraryUriForType(info.type);
+  var typeUri = _libraryUriForType(info.type);
+  typeUri ??= _resolveTypeUriByName(info.name, unit);
   if (typeUri == null || typeUri == libraryUri) {
     return info.name;
   }
@@ -590,18 +622,114 @@ String _formatThrownType(
   return info.name;
 }
 
+String? _resolveTypeUriByName(String name, CompilationUnit unit) {
+  String? match;
+  for (final directive in unit.directives) {
+    if (directive is! ImportDirective) continue;
+    final libraryImport = directive.libraryImport;
+    if (libraryImport == null) continue;
+    final library = libraryImport.importedLibrary;
+    if (library == null) continue;
+    final prefix = directive.prefix?.name;
+    final namespace = libraryImport.namespace;
+    var element = prefix == null || prefix.isEmpty
+        ? namespace.get2(name)
+        : namespace.getPrefixed2(prefix, name);
+    element ??= _libraryDefinesType(library, name) ? library : null;
+    if (element != null) {
+      final uri = library.uri.toString();
+      if (match != null && match != uri) return null;
+      match = uri;
+    }
+  }
+  return match;
+}
+
+bool _libraryDefinesType(LibraryElement library, String name) {
+  if (library.getClass(name) != null) return true;
+  if (library.getEnum(name) != null) return true;
+  if (library.getTypeAlias(name) != null) return true;
+  if (library.getExtensionType(name) != null) return true;
+  if (library.getMixin(name) != null) return true;
+  return false;
+}
+
 String _escapeSourceString(String value) {
   return value.replaceAll('\\', r'\\').replaceAll("'", r"\'");
+}
+
+List<String> _renderThrowsAnnotation(List<String> args) {
+  final singleLine = '@Throws(${args.join(', ')})';
+  if (singleLine.length <= 80) return [singleLine];
+  final lines = <String>['@Throws('];
+  for (final arg in args) {
+    lines.add('  $arg,');
+  }
+  lines.add(')');
+  return lines;
 }
 
 String _shortenSource(String source) {
   final parts = source.split('|');
   if (parts.isEmpty) return source;
-  final uri = parts.first;
+  final uri = _shortenSourceUri(parts.first);
   final namePart = parts.length > 1 ? parts[1] : '';
   var shortened = _shortenMethodName(namePart);
   if (shortened.isEmpty) shortened = namePart;
   return '$uri|$shortened';
+}
+
+String _shortenSourceUri(String uriValue) {
+  Uri? uri;
+  try {
+    uri = Uri.parse(uriValue);
+  } on FormatException {
+    return uriValue;
+  }
+  final scheme = uri.scheme;
+  if (scheme == 'dart') return uriValue;
+  if (scheme == 'package') {
+    return _packageName(uriValue) ?? uriValue;
+  }
+  if (scheme != 'file') return uriValue;
+
+  final segments = uri.pathSegments.where((segment) => segment.isNotEmpty);
+  final items = segments.toList();
+  if (items.isEmpty) return uriValue;
+
+  final dartIndex = items.indexOf('dart-sdk');
+  if (dartIndex != -1) {
+    final libIndex = items.indexOf('lib');
+    if (libIndex != -1 && libIndex + 1 < items.length) {
+      return 'dart:${items[libIndex + 1]}';
+    }
+  }
+
+  final libIndex = items.indexOf('lib');
+  if (libIndex > 0) {
+    return _stripVersionSuffix(items[libIndex - 1]);
+  }
+
+  final cachePackage = _packageFromCacheSegments(items);
+  if (cachePackage != null) return cachePackage;
+
+  return _stripVersionSuffix(items.last);
+}
+
+String? _packageFromCacheSegments(List<String> items) {
+  final hostedIndex = items.indexOf('hosted');
+  if (hostedIndex != -1 && hostedIndex + 2 < items.length) {
+    return _stripVersionSuffix(items[hostedIndex + 2]);
+  }
+  final gitIndex = items.indexOf('git');
+  if (gitIndex != -1 && gitIndex + 1 < items.length) {
+    return _stripVersionSuffix(items[gitIndex + 1]);
+  }
+  final pathIndex = items.indexOf('path');
+  if (pathIndex != -1 && pathIndex + 1 < items.length) {
+    return _stripVersionSuffix(items[pathIndex + 1]);
+  }
+  return null;
 }
 
 String _shortenMethodName(String namePart) {
@@ -616,6 +744,49 @@ String _shortenMethodName(String namePart) {
   }
   return name;
 }
+
+String _stripVersionSuffix(String name) {
+  final dashIndex = name.lastIndexOf('-');
+  if (dashIndex <= 0 || dashIndex == name.length - 1) return name;
+  final suffix = name.substring(dashIndex + 1);
+  if (_looksLikeVersion(suffix) || _looksLikeGitHash(suffix)) {
+    return name.substring(0, dashIndex);
+  }
+  return name;
+}
+
+bool _looksLikeVersion(String value) {
+  if (value.isEmpty) return false;
+  if (!_isDigit(value.codeUnitAt(0))) return false;
+  var hasDigit = false;
+  for (final unit in value.codeUnits) {
+    if (_isDigit(unit)) {
+      hasDigit = true;
+      continue;
+    }
+    if (_isLetter(unit) || unit == 0x2E || unit == 0x2B || unit == 0x2D) {
+      continue;
+    }
+    return false;
+  }
+  return hasDigit;
+}
+
+bool _looksLikeGitHash(String value) {
+  if (value.length < 7) return false;
+  for (final unit in value.codeUnits) {
+    final isDigit = _isDigit(unit);
+    final isHexLower = unit >= 0x61 && unit <= 0x66;
+    final isHexUpper = unit >= 0x41 && unit <= 0x46;
+    if (!(isDigit || isHexLower || isHexUpper)) return false;
+  }
+  return true;
+}
+
+bool _isDigit(int unit) => unit >= 0x30 && unit <= 0x39;
+
+bool _isLetter(int unit) =>
+    (unit >= 0x41 && unit <= 0x5A) || (unit >= 0x61 && unit <= 0x7A);
 
 String? _libraryUriForType(DartType? type) {
   if (type is InterfaceType) {

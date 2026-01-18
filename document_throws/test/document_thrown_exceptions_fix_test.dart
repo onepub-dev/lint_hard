@@ -8,6 +8,7 @@ import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dar
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:document_throws/src/document_thrown_exceptions.dart';
 import 'package:document_throws/src/document_thrown_exceptions_fix.dart';
+import 'package:document_throws/src/document_thrown_exceptions_fix_utils.dart';
 import 'package:test/test.dart';
 
 import 'support/document_thrown_exceptions_helpers.dart';
@@ -182,7 +183,7 @@ void main() {
     final updated = _applyEdits(content, fileEdits);
     expect(
       updated,
-      contains("import 'package:document_throws/document_throws.dart';"),
+      contains("import 'package:throws_annotations/throws_annotations.dart';"),
     );
     expect(updated, contains('@Throws(BadStateException)'));
   });
@@ -224,10 +225,29 @@ void main() {
     expect(
       updated,
       contains(
-        "import 'package:document_throws/document_throws.dart';\n"
+        "import 'package:throws_annotations/throws_annotations.dart';\n"
         "import 'package:yaml/yaml.dart' as y;\n",
       ),
     );
+    expect(updated, contains('@Throws(y.YamlException)\n'));
+  });
+
+  test('fix prefixes external throws types for aliased imports', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_prefixed_external.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      externalLookup: PrefixedThrowsCacheLookup(),
+    );
+    final edits = editsByFile[resolved.unit.path] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, edits);
     expect(updated, contains('@Throws(y.YamlException)\n'));
   });
 
@@ -268,9 +288,9 @@ void main() {
     final importBlock = RegExp(
       r"import 'dart:io';\n"
       r"\n?"
-      r"import 'package:document_throws/throws\.dart';\n"
       r"import 'package:path/path\.dart';\n"
-      r"\n?const sortkeyOption = 'sortkey';",
+      r"import 'package:throws_annotations/throws_annotations\.dart';\n"
+      r"\n*const sortkeyOption = 'sortkey';",
     );
     expect(updated, matches(importBlock));
     expect(
@@ -322,8 +342,10 @@ void main() {
     expect(updated, contains("const outputOption = 'output';\n"));
     expect(
       updated,
-      contains("import 'package:document_throws/document_throws.dart';\n"
-          "import 'package:path/path.dart';\n"),
+      contains(
+        "import 'package:path/path.dart';\n"
+        "import 'package:throws_annotations/throws_annotations.dart';\n",
+      ),
     );
     expect(updated, contains('@Throws(ArgumentError)\nvoid dsort('));
   });

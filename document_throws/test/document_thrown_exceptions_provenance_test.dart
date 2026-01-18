@@ -12,7 +12,7 @@ import 'package:test/test.dart';
 import 'support/document_thrown_exceptions_helpers.dart';
 
 void main() {
-  test('fix --source adds provenance for external throws', () async {
+  test('fix --origin adds provenance for external throws', () async {
     final fixturePath =
         'test/fixtures/document_thrown_exceptions_provenance.dart';
     final resolved = await resolveFixture(File(fixturePath).absolute.path);
@@ -33,13 +33,14 @@ void main() {
       edits,
     );
 
-    final callPattern =
-        r"@Throws\(FormatException, call: 'dart:core\|RegExp\.new'";
-    expect(updated, matches(RegExp(callPattern)));
-    expect(updated, contains("origin: 'dart:core|RegExp'"));
+    expect(updated, contains('@Throws(\n'));
+    expect(updated, contains('  FormatException,\n'));
+    expect(updated, contains("  call: 'dart:core|RegExp.new',\n"));
+    expect(updated, contains("  origin: 'dart:core|RegExp',\n"));
+    expect(updated, contains(')\n'));
   });
 
-  test('fix --source preserves reason without provenance', () async {
+  test('fix --origin preserves reason without provenance', () async {
     final fixturePath =
         'test/fixtures/document_thrown_exceptions_reason_source.dart';
     final resolved = await resolveFixture(File(fixturePath).absolute.path);
@@ -60,6 +61,89 @@ void main() {
     );
     final reasonPattern = "@Throws\\(BadStateException, reason: 'bad'\\)";
     expect(RegExp(reasonPattern).allMatches(updated).length, 1);
+  });
+
+  test('fix --origin shortens file origin to package name', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_provenance.dart';
+    final resolved = await resolveFixture(File(fixturePath).absolute.path);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      externalLookup: FilePathProvenanceLookup(),
+      includeSource: true,
+    );
+    expect(editsByFile, isNotEmpty);
+    final edits = editsByFile[resolved.unit.path] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    edits.sort((a, b) => b.offset.compareTo(a.offset));
+
+    final updated = SourceEdit.applySequence(
+      resolved.unit.content,
+      edits,
+    );
+
+    expect(updated, contains("origin: 'posix|_buildPasswd'"));
+  });
+
+  test('fix --origin wraps long throws annotation lines', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_provenance.dart';
+    final resolved = await resolveFixture(File(fixturePath).absolute.path);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      externalLookup: LongProvenanceLookup(),
+      includeSource: true,
+    );
+    expect(editsByFile, isNotEmpty);
+    final edits = editsByFile[resolved.unit.path] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    edits.sort((a, b) => b.offset.compareTo(a.offset));
+
+    final updated = SourceEdit.applySequence(
+      resolved.unit.content,
+      edits,
+    );
+
+    expect(updated, contains('@Throws(\n'));
+    expect(updated, contains('  FormatException,\n'));
+    expect(updated, contains("  call: 'dart:core|RegExp.new',\n"));
+    expect(
+      updated,
+      contains(
+        "  origin: 'very_long_package_name|veryLongOriginMethodName',\n",
+      ),
+    );
+    expect(updated, contains(')\n'));
+  });
+
+  test('fix without --origin strips provenance from annotations', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_provenance_existing.dart';
+    final resolved = await resolveFixture(File(fixturePath).absolute.path);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      externalLookup: ProvenanceThrowsCacheLookup(),
+      includeSource: false,
+    );
+    expect(editsByFile, isNotEmpty);
+    final edits = editsByFile[resolved.unit.path] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    edits.sort((a, b) => b.offset.compareTo(a.offset));
+
+    final updated = SourceEdit.applySequence(
+      resolved.unit.content,
+      edits,
+    );
+
+    expect(updated, contains('@Throws(FormatException)\n'));
+    expect(updated, isNot(contains('call:')));
+    expect(updated, isNot(contains('origin:')));
   });
 
   test('fix inserts throws import into library for part files', () async {
@@ -99,7 +183,7 @@ void main() {
     expect(partUpdated, contains('@Throws(BadStateException)'));
     expect(
       partUpdated,
-      isNot(contains('package:document_throws/document_throws.dart')),
+      isNot(contains('package:throws_annotations/throws_annotations.dart')),
     );
 
     final libraryEdits = editsByFile[File(libraryPath).absolute.path];
@@ -112,7 +196,7 @@ void main() {
     );
     expect(
       libraryUpdated,
-      contains("import 'package:document_throws/document_throws.dart';"),
+      contains("import 'package:throws_annotations/throws_annotations.dart';"),
     );
     await collection.dispose();
   });
@@ -144,7 +228,7 @@ void main() {
     try {
       final file = File('${tempDir.path}/sample.dart');
       await file.writeAsString(
-        "import 'package:document_throws/document_throws.dart';\n\n$updated",
+        "import 'package:throws_annotations/throws_annotations.dart';\n\n$updated",
       );
 
       final collection = AnalysisContextCollection(
