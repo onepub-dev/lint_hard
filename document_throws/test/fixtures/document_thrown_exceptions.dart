@@ -1,6 +1,6 @@
 // ignore_for_file: dead_code
 
-import 'package:document_throws/throws.dart';
+import 'package:document_throws/document_throws.dart';
 
 class BadStateException implements Exception {}
 class BadState implements Exception {}

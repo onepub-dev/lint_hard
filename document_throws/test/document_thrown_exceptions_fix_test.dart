@@ -12,6 +12,33 @@ import 'package:test/test.dart';
 
 import 'support/document_thrown_exceptions_helpers.dart';
 
+List<SourceEdit> _collectFileEdits(
+  List<SourceFileEdit> edits,
+  String filePath,
+) {
+  final fileEdits = edits
+      .where((edit) => edit.file == filePath)
+      .expand((edit) => edit.edits)
+      .toList();
+  expect(fileEdits, isNotEmpty);
+  fileEdits.sort((a, b) => a.offset.compareTo(b.offset));
+  return fileEdits;
+}
+
+String _applyEdits(String content, List<SourceEdit> edits) {
+  final sorted = List<SourceEdit>.from(edits)
+    ..sort((a, b) => b.offset.compareTo(a.offset));
+  var updated = content;
+  for (final edit in sorted) {
+    updated = updated.replaceRange(
+      edit.offset,
+      edit.offset + edit.length,
+      edit.replacement,
+    );
+  }
+  return updated;
+}
+
 void main() {
   late CompilationUnit unit;
   late ResolvedUnitResult resolvedUnit;
@@ -54,10 +81,9 @@ void main() {
     final builder = ChangeBuilder(session: resolvedUnit.session);
     await fix.compute(builder);
 
-    final edits = builder.sourceChange.edits;
-    expect(edits, isNotEmpty);
-    final fileEdit = edits.firstWhere((edit) => edit.file == fixtureFilePath);
-    return SourceEdit.applySequence(resolvedUnit.content, fileEdit.edits);
+    final edits = _collectFileEdits(builder.sourceChange.edits, fixtureFilePath);
+    final content = await File(fixtureFilePath).readAsString();
+    return _applyEdits(content, edits);
   }
 
   test('fix inserts throws annotations for rethrown exceptions', () async {
@@ -148,12 +174,16 @@ void main() {
     final builder = ChangeBuilder(session: resolved.unit.session);
     await fix.compute(builder);
 
-    final edits = builder.sourceChange.edits;
-    expect(edits, isNotEmpty);
-    final fileEdit = edits.firstWhere((edit) => edit.file == fixtureFilePath);
-    final updated =
-        SourceEdit.applySequence(resolved.unit.content, fileEdit.edits);
-    expect(updated, contains("import 'package:document_throws/throws.dart';"));
+    final fileEdits = _collectFileEdits(
+      builder.sourceChange.edits,
+      fixtureFilePath,
+    );
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, fileEdits);
+    expect(
+      updated,
+      contains("import 'package:document_throws/document_throws.dart';"),
+    );
     expect(updated, contains('@Throws(BadStateException)'));
   });
 
@@ -184,16 +214,17 @@ void main() {
     final builder = ChangeBuilder(session: resolved.unit.session);
     await fix.compute(builder);
 
-    final edits = builder.sourceChange.edits;
-    expect(edits, isNotEmpty);
-    final fileEdit = edits.firstWhere((edit) => edit.file == fixtureFilePath);
-    final updated =
-        SourceEdit.applySequence(resolved.unit.content, fileEdit.edits);
+    final fileEdits = _collectFileEdits(
+      builder.sourceChange.edits,
+      fixtureFilePath,
+    );
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, fileEdits);
 
     expect(
       updated,
       contains(
-        "import 'package:document_throws/throws.dart';\n"
+        "import 'package:document_throws/document_throws.dart';\n"
         "import 'package:yaml/yaml.dart' as y;\n",
       ),
     );
@@ -227,11 +258,12 @@ void main() {
     final builder = ChangeBuilder(session: resolved.unit.session);
     await fix.compute(builder);
 
-    final edits = builder.sourceChange.edits;
-    expect(edits, isNotEmpty);
-    final fileEdit = edits.firstWhere((edit) => edit.file == fixtureFilePath);
-    final updated =
-        SourceEdit.applySequence(resolved.unit.content, fileEdit.edits);
+    final fileEdits = _collectFileEdits(
+      builder.sourceChange.edits,
+      fixtureFilePath,
+    );
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, fileEdits);
 
     final importBlock = RegExp(
       r"import 'dart:io';\n"
@@ -249,6 +281,51 @@ void main() {
       ),
     );
     expect(updated, isNot(contains('prefiximport')));
+  });
+
+  test('fix preserves shebang and constant lines', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_shebang.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+    final fn = findFunction(resolved.unit.unit, 'dsort');
+
+    final diagnostic = Diagnostic.forValues(
+      source: resolved.unit.libraryFragment.source,
+      offset: fn.name.offset,
+      length: fn.name.length,
+      diagnosticCode: DocumentThrownExceptions.code,
+      message: DocumentThrownExceptions.code.problemMessage,
+      correctionMessage: DocumentThrownExceptions.code.correctionMessage,
+    );
+
+    final producerContext = CorrectionProducerContext.createResolved(
+      libraryResult: resolved.library,
+      unitResult: resolved.unit,
+      diagnostic: diagnostic,
+      selectionOffset: fn.name.offset,
+      selectionLength: fn.name.length,
+    );
+    final fix = DocumentThrownExceptionsFix(context: producerContext);
+    final builder = ChangeBuilder(session: resolved.unit.session);
+    await fix.compute(builder);
+
+    final fileEdits = _collectFileEdits(
+      builder.sourceChange.edits,
+      fixtureFilePath,
+    );
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, fileEdits);
+
+    expect(updated, startsWith('#!/usr/bin/env dart\n'));
+    expect(updated, contains("const sortkeyOption = 'sortkey';\n"));
+    expect(updated, contains("const outputOption = 'output';\n"));
+    expect(
+      updated,
+      contains("import 'package:document_throws/document_throws.dart';\n"
+          "import 'package:path/path.dart';\n"),
+    );
+    expect(updated, contains('@Throws(ArgumentError)\nvoid dsort('));
   });
 
   test('fix inserts annotation after doc comment', () async {

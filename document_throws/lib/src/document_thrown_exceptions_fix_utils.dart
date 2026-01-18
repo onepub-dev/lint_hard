@@ -224,7 +224,7 @@ bool _hasThrowsImport(CompilationUnit unit) {
   for (final directive in unit.directives) {
     if (directive is ImportDirective &&
         directive.uri.stringValue ==
-            'package:document_throws/throws.dart') {
+            'package:document_throws/document_throws.dart') {
       return true;
     }
   }
@@ -245,7 +245,7 @@ int _importGroupForUri(String uri) {
 }
 
 _ImportInsertion _importInsertion(CompilationUnit unit, String content) {
-  const newUri = 'package:document_throws/throws.dart';
+  const newUri = 'package:document_throws/document_throws.dart';
   final newGroup = _importGroupForUri(newUri);
   final imports = <_ImportInfo>[];
   for (final directive in unit.directives) {
@@ -445,7 +445,7 @@ String _importText(
       nextOffset != null &&
       _lineBreakCount(content, insertAt, nextOffset) < 2;
   final suffix = needsGroupSpacing ? '\n' : '';
-  return "${prefix}import 'package:document_throws/throws.dart';\n$suffix";
+  return "${prefix}import 'package:document_throws/document_throws.dart';\n$suffix";
 }
 
 bool _isLineBreak(int codeUnit) => codeUnit == 0x0A || codeUnit == 0x0D;
@@ -550,9 +550,11 @@ List<String> _formatThrownAnnotations(
     if (reasonSource != null) {
       buffer.write(', reason: $reasonSource');
     }
-    buffer.write(", call: '${_escapeSourceString(provenance.call)}'");
+    buffer.write(", call: '${_escapeSourceString(_shortenSource(provenance.call))}'");
     if (provenance.origin != null) {
-      buffer.write(", origin: '${_escapeSourceString(provenance.origin!)}'");
+      buffer.write(
+        ", origin: '${_escapeSourceString(_shortenSource(provenance.origin!))}'",
+      );
     }
     lines.add('@Throws($buffer)');
   }
@@ -590,6 +592,29 @@ String _formatThrownType(
 
 String _escapeSourceString(String value) {
   return value.replaceAll('\\', r'\\').replaceAll("'", r"\'");
+}
+
+String _shortenSource(String source) {
+  final parts = source.split('|');
+  if (parts.isEmpty) return source;
+  final uri = parts.first;
+  final namePart = parts.length > 1 ? parts[1] : '';
+  var shortened = _shortenMethodName(namePart);
+  if (shortened.isEmpty) shortened = namePart;
+  return '$uri|$shortened';
+}
+
+String _shortenMethodName(String namePart) {
+  var name = namePart;
+  final hashIndex = name.lastIndexOf('#');
+  if (hashIndex != -1) {
+    name = name.substring(hashIndex + 1);
+  }
+  final parenIndex = name.indexOf('(');
+  if (parenIndex != -1) {
+    name = name.substring(0, parenIndex);
+  }
+  return name;
 }
 
 String? _libraryUriForType(DartType? type) {

@@ -1,0 +1,3 @@
+dependency_overrides:
+  document_throws:
+    path: ../../document_throws

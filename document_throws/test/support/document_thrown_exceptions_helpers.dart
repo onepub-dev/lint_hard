@@ -8,6 +8,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:document_throws/src/throws_cache.dart';
 import 'package:document_throws/src/throws_cache_lookup.dart';
+import 'package:path/path.dart' as p;
 
 class ResolvedFixture {
   final ResolvedUnitResult unit;
@@ -17,8 +18,9 @@ class ResolvedFixture {
 }
 
 Future<ResolvedFixture> resolveFixture(String filePath) async {
+  final rootPath = p.normalize(Directory.current.path);
   final collection = AnalysisContextCollection(
-    includedPaths: [filePath],
+    includedPaths: [rootPath],
     resourceProvider: PhysicalResourceProvider.INSTANCE,
   );
   final context = collection.contextFor(filePath);

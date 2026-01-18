@@ -1,4 +1,4 @@
-import 'package:document_throws/throws.dart';
+import 'package:document_throws/document_throws.dart';
 
 class BadStateException implements Exception {}
 

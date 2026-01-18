@@ -112,3 +112,8 @@ class MyYaml {
 - [] optimise the code and improve the code structure.
 
 - [] run a performance analysis looking for improvments.
+
+- [] do recreate the indexes if they already exist unless the user passes
+the --recreate flag.
+
+- [] check the flutter sdk indexes are being built
