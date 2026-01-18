@@ -23,7 +23,17 @@ Future<void> main(List<String> args) async {
   stdout.writeln('lint_hard_fix $packageVersion');
 
   final root = Directory.current.path;
+  final includeSource = args.contains('--source');
   final patterns = args.where((arg) => !arg.startsWith('-')).toList();
+  if (includeSource) {
+    stdout.writeln(
+      'Including provenance in @Throws annotations (--source).',
+    );
+    stdout.writeln(
+      'To remove provenance, rerun lint_hard_fix without --source after '
+      'removing existing @Throws annotations.',
+    );
+  }
   final files = await _collectDartFiles(patterns, root);
   if (files.isEmpty) {
     stderr.writeln('No Dart files matched.');
@@ -60,6 +70,7 @@ Future<void> main(List<String> args) async {
       unitResult,
       libraryResult.units,
       externalLookup: externalLookup,
+      includeSource: includeSource,
     );
     if (edits.isEmpty) continue;
 
@@ -144,10 +155,13 @@ Future<ResolvedLibraryResult?> _resolvedLibraryForFile(
 void _printUsage() {
   stdout.writeln('Apply lint_hard fixes to Dart files.');
   stdout.writeln('');
-  stdout.writeln('Usage: lint_hard_fix [<glob> ...]');
+  stdout.writeln('Usage: lint_hard_fix [--source] [<glob> ...]');
   stdout.writeln('');
   stdout.writeln('If no globs are provided, all .dart files under the');
   stdout.writeln('current directory are processed.');
+  stdout.writeln('');
+  stdout.writeln('Options:');
+  stdout.writeln('  --source  Include call/origin provenance in @Throws.');
   stdout.writeln('');
   stdout.writeln('Examples:');
   stdout.writeln("  lint_hard_fix 'lib/**/*.dart'");

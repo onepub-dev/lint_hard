@@ -7,7 +7,9 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
+import 'package:analyzer/source/line_info.dart';
 
+import 'throws_cache.dart';
 import 'throws_cache_lookup.dart';
 
 class DocumentThrownExceptions extends AnalysisRule {
@@ -116,12 +118,17 @@ _ThrownTypeResults _collectThrownTypes(
   Map<String, CompilationUnit>? unitsByPath,
   _ThrownTypeResolver? resolver,
   ThrowsCacheLookup? externalLookup,
+  bool includeLineNumbersForAll = false,
 }) {
   final effectiveResolver =
       resolver ??
       (unitsByPath == null
           ? null
-          : _ThrownTypeResolver(unitsByPath, externalLookup: externalLookup));
+          : _ThrownTypeResolver(
+              unitsByPath,
+              externalLookup: externalLookup,
+              includeLineNumbersForAll: includeLineNumbersForAll,
+            ));
   final collector = _ThrowTypeCollector(effectiveResolver);
   body.accept(collector);
   return _ThrownTypeResults(
@@ -170,12 +177,14 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
   bool allowSourceFallback = false,
   Map<String, CompilationUnit>? unitsByPath,
   ThrowsCacheLookup? externalLookup,
+  bool includeLineNumbersForAll = false,
 }) {
   // Prefer AST; optionally fallback to source parsing for edge cases.
   final thrownResults = _collectThrownTypes(
     body,
     unitsByPath: unitsByPath,
     externalLookup: externalLookup,
+    includeLineNumbersForAll: includeLineNumbersForAll,
   );
   final thrownTypes = thrownResults.types;
   if (thrownTypes.isEmpty &&
@@ -190,9 +199,20 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
   final byName = <String, ThrownTypeInfo>{};
   for (final info in thrownResults.infos) {
     final existing = byName[info.name];
-    if (existing == null || (existing.type == null && info.type != null)) {
+    if (existing == null) {
       byName[info.name] = info;
+      continue;
     }
+    final mergedProvenance = [
+      ...existing.provenance,
+      ...info.provenance,
+    ];
+    final mergedType = existing.type ?? info.type;
+    byName[info.name] = ThrownTypeInfo(
+      info.name,
+      mergedType,
+      provenance: mergedProvenance,
+    );
   }
   for (final name in thrownTypes) {
     byName.putIfAbsent(name, () => ThrownTypeInfo(name, null));
@@ -217,6 +237,20 @@ Set<String> collectThrownTypeNames(
     unitsByPath: unitsByPath,
     externalLookup: externalLookup,
   ).types;
+}
+
+List<ThrownTypeInfo> collectThrownTypeInfos(
+  FunctionBody body, {
+  Map<String, CompilationUnit>? unitsByPath,
+  ThrowsCacheLookup? externalLookup,
+  bool includeLineNumbersForAll = false,
+}) {
+  return _collectThrownTypes(
+    body,
+    unitsByPath: unitsByPath,
+    externalLookup: externalLookup,
+    includeLineNumbersForAll: includeLineNumbersForAll,
+  ).infos;
 }
 
 // Extract thrown types from source text as a fallback.
@@ -264,8 +298,13 @@ String? _extractThrowTypeName(Expression expression) {
 class ThrownTypeInfo {
   final String name;
   final DartType? type;
+  final List<ThrowsProvenance> provenance;
 
-  const ThrownTypeInfo(this.name, this.type);
+  const ThrownTypeInfo(
+    this.name,
+    this.type, {
+    this.provenance = const [],
+  });
 }
 
 class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
@@ -351,9 +390,10 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
 
   void _addInvokedThrows(ExecutableElement? element) {
     if (element == null || _resolver == null) return;
+    final callKey = _resolver.keyForExecutable(element);
     final invoked = _resolver.thrownTypesForExecutable(element);
     for (final info in invoked) {
-      _recordThrow(info);
+      _recordThrow(_applyCallProvenance(info, callKey));
     }
   }
 
@@ -434,6 +474,34 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
   }
 }
 
+ThrownTypeInfo _applyCallProvenance(
+  ThrownTypeInfo info,
+  String callKey,
+) {
+  if (info.provenance.isEmpty) {
+    return ThrownTypeInfo(
+      info.name,
+      info.type,
+      provenance: [ThrowsProvenance(call: callKey, origin: null)],
+    );
+  }
+  final provenance = <ThrowsProvenance>[];
+  for (final entry in info.provenance) {
+    final origin = entry.origin ?? entry.call;
+    provenance.add(
+      ThrowsProvenance(
+        call: callKey,
+        origin: origin == callKey ? null : origin,
+      ),
+    );
+  }
+  return ThrownTypeInfo(
+    info.name,
+    info.type,
+    provenance: provenance,
+  );
+}
+
 class _RethrowFinder extends RecursiveAstVisitor<void> {
   bool found = false;
 
@@ -509,11 +577,17 @@ String? _catchTypeName(TypeAnnotation exceptionType) {
 class _ThrownTypeResolver {
   final Map<String, CompilationUnit> _unitsByPath;
   final ThrowsCacheLookup? _externalLookup;
+  final bool _includeLineNumbersForAll;
   final Map<ExecutableElement, List<ThrownTypeInfo>> _cache = {};
   final Set<ExecutableElement> _inProgress = {};
+  final Map<String, LineInfo> _lineInfoCache = {};
 
-  _ThrownTypeResolver(this._unitsByPath, {ThrowsCacheLookup? externalLookup})
-    : _externalLookup = externalLookup;
+  _ThrownTypeResolver(
+    this._unitsByPath, {
+    ThrowsCacheLookup? externalLookup,
+    bool includeLineNumbersForAll = false,
+  }) : _externalLookup = externalLookup,
+       _includeLineNumbersForAll = includeLineNumbersForAll;
 
   List<ThrownTypeInfo> thrownTypesForExecutable(ExecutableElement element) {
     final cached = _cache[element];
@@ -537,9 +611,17 @@ class _ThrownTypeResolver {
       }
     }
     if (unit == null) {
-      final cached = _externalLookup?.lookup(element) ?? const <String>[];
-      for (final name in cached) {
-        infos.add(ThrownTypeInfo(name, null));
+      final cached = _externalLookup?.lookupWithProvenance(element);
+      if (cached != null) {
+        for (final entry in cached) {
+          infos.add(
+            ThrownTypeInfo(
+              entry.name,
+              null,
+              provenance: entry.provenance,
+            ),
+          );
+        }
       }
     }
 
@@ -553,6 +635,72 @@ class _ThrownTypeResolver {
     if (source == null) return null;
     return _unitsByPath[source.fullName];
   }
+
+  String keyForExecutable(ExecutableElement element) {
+    final libraryUri = element.library.firstFragment.source.uri.toString();
+    final baseKey = _keyForExecutableElement(element, libraryUri);
+    final includeLine = _includeLineNumbersForAll || _unitForFragment(
+      element.firstFragment,
+    ) == null;
+    if (!includeLine) return baseKey;
+    final line = _lineNumberForElement(element);
+    return line == null ? baseKey : '$baseKey:$line';
+  }
+
+  int? _lineNumberForElement(ExecutableElement element) {
+    final source = element.library.firstFragment.source;
+    final path = source.fullName;
+    final lineInfo = _lineInfoCache.putIfAbsent(path, () {
+      final content = source.contents.data;
+      return LineInfo.fromContent(content);
+    });
+    final offset = element.firstFragment.offset;
+    return lineInfo.getLocation(offset).lineNumber;
+  }
+}
+
+String _keyForExecutableElement(ExecutableElement element, String libraryUri) {
+  if (element is ConstructorElement) {
+    final className = element.enclosingElement.name ?? '';
+    final ctorElementName = element.name;
+    final ctorName = (ctorElementName == null || ctorElementName.isEmpty)
+        ? className
+        : '$className.$ctorElementName';
+    return ThrowsCacheKeyBuilder.build(
+      libraryUri: libraryUri,
+      container: className,
+      name: ctorName,
+      parameterTypes: _parameterTypes(element),
+    );
+  }
+
+  final container = _containerName(element.enclosingElement);
+  final name = element.name ?? '';
+  return ThrowsCacheKeyBuilder.build(
+    libraryUri: libraryUri,
+    container: container,
+    name: name,
+    parameterTypes: _parameterTypes(element),
+  );
+}
+
+String _containerName(Element? element) {
+  if (element is ClassElement) return element.name ?? 'class';
+  if (element is MixinElement) return element.name ?? 'mixin';
+  if (element is ExtensionElement) return element.name ?? 'extension';
+  if (element is InterfaceElement) return element.name ?? 'interface';
+  return '_';
+}
+
+List<String> _parameterTypes(ExecutableElement element) {
+  return element.formalParameters
+      .map((parameter) => _typeDisplayName(parameter.type))
+      .toList();
+}
+
+String _typeDisplayName(DartType type) {
+  if (type is VoidType) return 'void';
+  return type.getDisplayString();
 }
 
 _ExecutableNode? _executableNodeFrom(AstNode? node) {

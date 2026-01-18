@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
@@ -56,6 +57,61 @@ class ThrowsCacheLookup {
       }
     }
     return const <String>[];
+  }
+
+  List<CachedThrownType> lookupWithProvenance(ExecutableElement element) {
+    final uri = element.library.firstFragment.source.uri;
+    final scheme = uri.scheme;
+    if (scheme == 'package') {
+      final package = uri.pathSegments.isEmpty ? '' : uri.pathSegments.first;
+      final sourceId = packageSources[package];
+      final version =
+          sourceId == 'sdk' ? flutterVersion : packageVersions[package];
+      if (version == null) return const <CachedThrownType>[];
+      final file =
+          cache.openPackage(package, version, sourceId: sourceId);
+      if (file == null) return const <CachedThrownType>[];
+      return _lookupWithProvenance(file, element, uri.toString());
+    }
+    if (scheme == 'dart') {
+      final version = sdkVersion;
+      if (version == null) return const <CachedThrownType>[];
+      final file = cache.openSdk(version);
+      if (file == null) return const <CachedThrownType>[];
+      return _lookupWithProvenance(file, element, uri.toString());
+    }
+    if (scheme == 'file' && sdkRoot != null) {
+      final normalized = _sdkLibraryUri(uri, sdkRoot!);
+      if (normalized != null) {
+        final version = sdkVersion;
+        if (version == null) return const <CachedThrownType>[];
+        final file = cache.openSdk(version);
+        if (file == null) return const <CachedThrownType>[];
+        return _lookupWithProvenance(file, element, normalized);
+      }
+    }
+    return const <CachedThrownType>[];
+  }
+
+  List<CachedThrownType> _lookupWithProvenance(
+    ThrowsCacheFile file,
+    ExecutableElement element,
+    String libraryUri,
+  ) {
+    final key = _keyForExecutable(element, libraryUri);
+    final thrown = file.lookup(key);
+    if (thrown.isEmpty) return const <CachedThrownType>[];
+    final provenance = file.lookupProvenance(key);
+    final results = <CachedThrownType>[];
+    for (final name in thrown) {
+      results.add(
+        CachedThrownType(
+          name,
+          provenance: provenance[name] ?? const <ThrowsProvenance>[],
+        ),
+      );
+    }
+    return results;
   }
 
   MissingThrowsCaches missingCaches() {
@@ -124,6 +180,16 @@ class MissingThrowsCaches {
   bool get isEmpty => !sdkMissing && missingPackages.isEmpty;
 }
 
+class CachedThrownType {
+  final String name;
+  final List<ThrowsProvenance> provenance;
+
+  const CachedThrownType(
+    this.name, {
+    this.provenance = const [],
+  });
+}
+
 String _keyForExecutable(ExecutableElement element, String libraryUri) {
   if (element is ConstructorElement) {
     final className = element.enclosingElement.name ?? '';
@@ -131,21 +197,25 @@ String _keyForExecutable(ExecutableElement element, String libraryUri) {
     final ctorName = (ctorElementName == null || ctorElementName.isEmpty)
         ? className
         : '$className.$ctorElementName';
-    return ThrowsCacheKeyBuilder.build(
+    final baseKey = ThrowsCacheKeyBuilder.build(
       libraryUri: libraryUri,
       container: className,
       name: ctorName,
       parameterTypes: _parameterTypes(element),
     );
+    final line = _lineNumberForElement(element);
+    return line == null ? baseKey : '$baseKey:$line';
   }
   final container = _containerName(element.enclosingElement);
   final name = element.name ?? '';
-  return ThrowsCacheKeyBuilder.build(
+  final baseKey = ThrowsCacheKeyBuilder.build(
     libraryUri: libraryUri,
     container: container,
     name: name,
     parameterTypes: _parameterTypes(element),
   );
+  final line = _lineNumberForElement(element);
+  return line == null ? baseKey : '$baseKey:$line';
 }
 
 String _containerName(Element? element) {
@@ -165,6 +235,14 @@ List<String> _parameterTypes(ExecutableElement element) {
 String _typeDisplayName(DartType type) {
   if (type is VoidType) return 'void';
   return type.getDisplayString();
+}
+
+int? _lineNumberForElement(ExecutableElement element) {
+  final source = element.library.firstFragment.source;
+  final content = source.contents.data;
+  final lineInfo = LineInfo.fromContent(content);
+  final offset = element.firstFragment.offset;
+  return lineInfo.getLocation(offset).lineNumber;
 }
 
 Map<String, String> _readPackageVersions(File lockFile) {

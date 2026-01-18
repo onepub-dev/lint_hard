@@ -759,4 +759,15 @@ class _TestThrowsCacheLookup extends ThrowsCacheLookup {
     }
     return const <String>[];
   }
+
+  @override
+  List<CachedThrownType> lookupWithProvenance(ExecutableElement element) {
+    final uri = element.library.firstFragment.source.uri.toString();
+    if (uri == 'dart:core' &&
+        element is ConstructorElement &&
+        element.enclosingElement.name == 'RegExp') {
+      return const [CachedThrownType('FormatException')];
+    }
+    return const <CachedThrownType>[];
+  }
 }

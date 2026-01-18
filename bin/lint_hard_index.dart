@@ -146,7 +146,7 @@ Future<void> main(List<String> args) async {
   }
 }
 
-Future<Map<String, List<String>>> _indexPackage(
+Future<Map<String, ThrowsCacheEntry>> _indexPackage(
   String packageRoot,
   String? sdkPath, {
   String? packageName,
@@ -155,7 +155,7 @@ Future<Map<String, List<String>>> _indexPackage(
   final libDir = Directory(p.join(packageRoot, 'lib'));
   if (!libDir.existsSync()) {
     log?.call('  No lib/ directory in $packageRoot');
-    return const <String, List<String>>{};
+    return const <String, ThrowsCacheEntry>{};
   }
   final files = _collectDartFiles(libDir);
   log?.call('  Scanning ${libDir.path}');
@@ -168,7 +168,7 @@ Future<Map<String, List<String>>> _indexPackage(
   );
 }
 
-Future<Map<String, List<String>>> _indexSdk(
+Future<Map<String, ThrowsCacheEntry>> _indexSdk(
   String sdkRoot,
   String? sdkPath, {
   void Function(String message)? log,
@@ -176,28 +176,28 @@ Future<Map<String, List<String>>> _indexSdk(
   final libDir = Directory(p.join(sdkRoot, 'lib'));
   if (!libDir.existsSync()) {
     log?.call('  No lib/ directory in SDK at $sdkRoot');
-    return const <String, List<String>>{};
+    return const <String, ThrowsCacheEntry>{};
   }
   final files = _collectDartFiles(libDir);
   log?.call('  Scanning ${libDir.path}');
   return _indexLibraries(libDir.path, files, sdkPath, log: log);
 }
 
-Future<Map<String, List<String>>> _indexLibraries(
+Future<Map<String, ThrowsCacheEntry>> _indexLibraries(
   String rootPath,
   List<String> files,
   String? sdkPath, {
   String? packageName,
   void Function(String message)? log,
 }) async {
-  if (files.isEmpty) return const <String, List<String>>{};
+  if (files.isEmpty) return const <String, ThrowsCacheEntry>{};
   final collection = AnalysisContextCollection(
     includedPaths: [p.normalize(rootPath)],
     sdkPath: sdkPath,
   );
   final context = collection.contextFor(files.first);
   final session = context.currentSession;
-  final entries = <String, List<String>>{};
+  final entries = <String, ThrowsCacheEntry>{};
   final seenLibraries = <String>{};
   log?.call('  Resolving libraries...');
 

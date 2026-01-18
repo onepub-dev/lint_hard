@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:lint_hard/src/throws_cache.dart';
 import 'package:lint_hard/src/throws_cache_writer.dart';
 import 'package:test/test.dart';
 
@@ -9,7 +10,7 @@ void main() {
     try {
       final outFile = File('${dir.path}/sample.throws');
       ThrowsCacheWriter.writeFileSync(outFile, {
-        'key': ['BadStateException'],
+        'key': ThrowsCacheEntry(thrown: ['BadStateException']),
       });
 
       expect(outFile.existsSync(), isTrue);

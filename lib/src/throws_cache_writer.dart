@@ -7,7 +7,7 @@ import 'package:path/path.dart' as p;
 import 'throws_cache.dart';
 
 class ThrowsCacheWriter {
-  static void writeFileSync(File file, Map<String, List<String>> entries) {
+  static void writeFileSync(File file, Map<String, ThrowsCacheEntry> entries) {
     file.parent.createSync(recursive: true);
     final tempFile = _tempFileFor(file);
     final sortedKeys = entries.keys.toList()..sort();
@@ -20,13 +20,17 @@ class ThrowsCacheWriter {
 
     final dataBuilder = BytesBuilder();
     final recordMeta = <String, _RecordMeta>{};
+    final hasProvenance = _hasProvenance(entries);
     for (final key in sortedKeys) {
-      final throwsList = entries[key] ?? const <String>[];
+      final entry = entries[key];
+      if (entry == null) continue;
+      final throwsList = entry.thrown;
+      final provenance = entry.provenance;
       final keyBytes = utf8.encode(key);
       final header = ByteData(8);
       header.setUint16(0, keyBytes.length, Endian.little);
       header.setUint16(2, throwsList.length, Endian.little);
-      header.setUint32(4, 0, Endian.little);
+      header.setUint32(4, provenance.isEmpty ? 0 : 1, Endian.little);
 
       final recordOffset = _headerSize + dataBuilder.length;
       dataBuilder.add(header.buffer.asUint8List());
@@ -38,7 +42,36 @@ class ThrowsCacheWriter {
         dataBuilder.add(entryBytes.buffer.asUint8List());
       }
 
-      final recordLength = 8 + keyBytes.length + throwsList.length * 4;
+      if (provenance.isNotEmpty) {
+        for (final thrown in throwsList) {
+          final provList = provenance[thrown] ?? const <ThrowsProvenance>[];
+          final headerBytes = ByteData(4);
+          headerBytes.setUint16(0, provList.length, Endian.little);
+          headerBytes.setUint16(2, 0, Endian.little);
+          dataBuilder.add(headerBytes.buffer.asUint8List());
+          for (final prov in provList) {
+            final callIndex = stringIndex[prov.call] ?? 0;
+            final originIndex = prov.origin == null
+                ? 0xFFFFFFFF
+                : (stringIndex[prov.origin!] ?? 0);
+            final provBytes = ByteData(8);
+            provBytes.setUint32(0, callIndex, Endian.little);
+            provBytes.setUint32(4, originIndex, Endian.little);
+            dataBuilder.add(provBytes.buffer.asUint8List());
+          }
+        }
+      }
+
+      var recordLength = 8 + keyBytes.length + throwsList.length * 4;
+      if (provenance.isNotEmpty) {
+        var provBytes = 0;
+        for (final thrown in throwsList) {
+          final provList = provenance[thrown] ?? const <ThrowsProvenance>[];
+          provBytes += 4;
+          provBytes += provList.length * 8;
+        }
+        recordLength += provBytes;
+      }
       recordMeta[key] = _RecordMeta(
         offset: recordOffset,
         length: recordLength,
@@ -84,6 +117,7 @@ class ThrowsCacheWriter {
     final indexCount = indexRecords.length;
 
     final header = _buildHeader(
+      flags: hasProvenance ? 1 : 0,
       indexOffset: indexOffset,
       indexCount: indexCount,
       stringTableOffset: stringTableOffset,
@@ -109,13 +143,30 @@ class ThrowsCacheWriter {
     tempFile.renameSync(file.path);
   }
 
-  static List<String> _collectStrings(Map<String, List<String>> entries) {
+  static List<String> _collectStrings(
+    Map<String, ThrowsCacheEntry> entries,
+  ) {
     final set = <String>{};
-    for (final list in entries.values) {
-      set.addAll(list);
+    for (final entry in entries.values) {
+      set.addAll(entry.thrown);
+      for (final provList in entry.provenance.values) {
+        for (final prov in provList) {
+          set.add(prov.call);
+          if (prov.origin != null) {
+            set.add(prov.origin!);
+          }
+        }
+      }
     }
     final list = set.toList()..sort();
     return list;
+  }
+
+  static bool _hasProvenance(Map<String, ThrowsCacheEntry> entries) {
+    for (final entry in entries.values) {
+      if (entry.provenance.isNotEmpty) return true;
+    }
+    return false;
   }
 
   static Uint8List _buildStringTable(List<String> strings) {
@@ -140,6 +191,7 @@ class ThrowsCacheWriter {
   }
 
   static Uint8List _buildHeader({
+    required int flags,
     required int indexOffset,
     required int indexCount,
     required int stringTableOffset,
@@ -156,7 +208,7 @@ class ThrowsCacheWriter {
     header.setUint8(6, 0x57);
     header.setUint8(7, 0x00);
     header.setUint32(8, 1, Endian.little);
-    header.setUint32(12, 0, Endian.little);
+    header.setUint32(12, flags, Endian.little);
     header.setUint64(16, indexOffset, Endian.little);
     header.setUint64(24, indexCount, Endian.little);
     header.setUint64(32, stringTableOffset, Endian.little);

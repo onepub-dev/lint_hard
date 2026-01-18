@@ -25,8 +25,10 @@ void main() {
         name: 'bar',
         parameterTypes: ['int'],
       );
-      final entries = <String, List<String>>{
-        key: ['BadStateException', 'MissingFileException'],
+      final entries = <String, ThrowsCacheEntry>{
+        key: ThrowsCacheEntry(
+          thrown: ['BadStateException', 'MissingFileException'],
+        ),
       };
       ThrowsCacheWriter.writeFileSync(file, entries);
 
@@ -49,12 +51,54 @@ void main() {
         name: 'bar',
         parameterTypes: ['int'],
       );
-      ThrowsCacheWriter.writeFileSync(file, {key: ['BadStateException']});
+      ThrowsCacheWriter.writeFileSync(
+        file,
+        {
+          key: ThrowsCacheEntry(thrown: ['BadStateException']),
+        },
+      );
 
       final cacheFile = ThrowsCacheFile.openSync(file);
       expect(cacheFile, isNotNull);
       final result = cacheFile!.lookup('$key#missing');
       expect(result, isEmpty);
+    } finally {
+      dir.deleteSync(recursive: true);
+    }
+  });
+
+  test('cache lookup returns provenance entries', () {
+    final dir = Directory.systemTemp.createTempSync('throws_cache_test_');
+    try {
+      final file = File('${dir.path}/sample.throws');
+      final key = ThrowsCacheKeyBuilder.build(
+        libraryUri: 'package:foo/foo.dart',
+        container: 'Foo',
+        name: 'bar',
+        parameterTypes: ['int'],
+      );
+      ThrowsCacheWriter.writeFileSync(
+        file,
+        {
+          key: ThrowsCacheEntry(
+            thrown: ['BadStateException'],
+            provenance: {
+              'BadStateException': [
+                ThrowsProvenance(
+                  call: 'package:foo/foo.dart|Foo#baz()',
+                  origin: 'package:foo/foo.dart|Foo#baz()',
+                ),
+              ],
+            },
+          ),
+        },
+      );
+
+      final cacheFile = ThrowsCacheFile.openSync(file);
+      expect(cacheFile, isNotNull);
+      final provenance = cacheFile!.lookupProvenance(key);
+      expect(provenance.containsKey('BadStateException'), isTrue);
+      expect(provenance['BadStateException']!.first.call, contains('Foo#baz'));
     } finally {
       dir.deleteSync(recursive: true);
     }

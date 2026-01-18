@@ -67,7 +67,7 @@ All integers are little-endian.
 offset size  name
 0      8     magic = "LHTHROW\0"
 8      4     format_version = 1
-12     4     flags (reserved, 0)
+12     4     flags (bitset)
 16     8     index_offset (absolute file offset)
 24     8     index_count (number of index records)
 32     8     string_table_offset
@@ -75,6 +75,9 @@ offset size  name
 48     8     data_offset (start of data records)
 56     8     reserved (0)
 ```
+
+Header flags:
+- `0x01`: provenance data present.
 
 ### Footer (32 bytes)
 ```
@@ -110,13 +113,24 @@ Each record encodes one executable signature and its thrown types.
 offset size  name
 0      2     key_length (u16)
 2      2     thrown_count (u16)
-4      4     reserved (0)
+4      4     record_flags
 8      N     key_bytes (UTF-8)
 8+N    4*M   thrown_type_string_offsets (u32 offsets into string table)
 ```
 
 `key_length` counts UTF-8 bytes in `key_bytes`. `thrown_count` is the number
 of thrown types. Each thrown type is an offset into the string table.
+
+If `record_flags & 0x01` is set, append provenance blocks for each thrown type:
+
+```
+for each thrown type:
+  2 bytes  provenance_count (u16)
+  2 bytes  reserved (0)
+  for each provenance entry:
+    4 bytes call_string_offset (u32)
+    4 bytes origin_string_offset (u32, 0xFFFFFFFF when absent)
+```
 
 ## String Table
 A concatenated UTF-8 table of unique strings used by records.
@@ -155,6 +169,12 @@ package:foo/foo.dart|_#doThing(String)
 
 Parameter types should use the resolved display string without nullability
 suffixes stripped (e.g. `String?` is distinct).
+
+For external packages and SDK entries, append a 1-based line number:
+
+```
+package:foo/bar.dart|Foo#baz(int,String):123
+```
 
 ## Hashing
 Use a stable 64-bit hash of the full key (e.g. xxHash64).

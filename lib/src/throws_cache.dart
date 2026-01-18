@@ -62,10 +62,32 @@ class ThrowsCache {
   }
 }
 
+class ThrowsProvenance {
+  final String call;
+  final String? origin;
+
+  const ThrowsProvenance({
+    required this.call,
+    required this.origin,
+  });
+}
+
+class ThrowsCacheEntry {
+  final List<String> thrown;
+  final Map<String, List<ThrowsProvenance>> provenance;
+
+  const ThrowsCacheEntry({
+    required this.thrown,
+    this.provenance = const {},
+  });
+}
+
 class ThrowsCacheFile {
   static const _magic = 'LHTHROW\u0000';
   static const _headerSize = 64;
   static const _indexRecordSize = 32;
+  static const _flagProvenance = 0x1;
+  static const _nullOffset = 0xFFFFFFFF;
 
   final Uint8List _bytes;
   final ByteData _data;
@@ -73,6 +95,7 @@ class ThrowsCacheFile {
   final int _indexCount;
   final int _stringTableOffset;
   final int _stringTableLength;
+  final int _flags;
 
   List<String>? _strings;
 
@@ -83,6 +106,7 @@ class ThrowsCacheFile {
     this._indexCount,
     this._stringTableOffset,
     this._stringTableLength,
+    this._flags,
   );
 
   static ThrowsCacheFile? openSync(File file) {
@@ -93,6 +117,7 @@ class ThrowsCacheFile {
     if (magic != _magic) return null;
     final version = data.getUint32(8, Endian.little);
     if (version != 1) return null;
+    final flags = data.getUint32(12, Endian.little);
     final indexOffset = data.getUint64(16, Endian.little);
     final indexCount = data.getUint64(24, Endian.little);
     final stringTableOffset = data.getUint64(32, Endian.little);
@@ -104,6 +129,7 @@ class ThrowsCacheFile {
       indexCount,
       stringTableOffset,
       stringTableLength,
+      flags,
     );
   }
 
@@ -122,6 +148,50 @@ class ThrowsCacheFile {
     for (final offset in offsets) {
       if (offset < 0 || offset >= strings.length) continue;
       result.add(strings[offset]);
+    }
+    return result;
+  }
+
+  Map<String, List<ThrowsProvenance>> lookupProvenance(String key) {
+    if ((_flags & _flagProvenance) == 0) {
+      return const <String, List<ThrowsProvenance>>{};
+    }
+    final strings = _loadStrings();
+    final keyHash = hashThrowsCacheKey(key);
+    final index = _findIndex(keyHash);
+    if (index == null) return const <String, List<ThrowsProvenance>>{};
+
+    final record = _readRecord(index, key);
+    if (record == null) return const <String, List<ThrowsProvenance>>{};
+    if (record.provenanceOffsets.isEmpty) {
+      return const <String, List<ThrowsProvenance>>{};
+    }
+
+    final result = <String, List<ThrowsProvenance>>{};
+    for (var i = 0; i < record.thrownOffsets.length; i++) {
+      final typeIndex = record.thrownOffsets[i];
+      if (typeIndex < 0 || typeIndex >= strings.length) continue;
+      final typeName = strings[typeIndex];
+      final provOffsets = record.provenanceOffsets[i];
+      if (provOffsets.isEmpty) continue;
+      final provenance = <ThrowsProvenance>[];
+      for (final offsets in provOffsets) {
+        if (offsets.callOffset < 0 ||
+            offsets.callOffset >= strings.length) {
+          continue;
+        }
+        final call = strings[offsets.callOffset];
+        String? origin;
+        if (offsets.originOffset != _nullOffset &&
+            offsets.originOffset >= 0 &&
+            offsets.originOffset < strings.length) {
+          origin = strings[offsets.originOffset];
+        }
+        provenance.add(ThrowsProvenance(call: call, origin: origin));
+      }
+      if (provenance.isNotEmpty) {
+        result[typeName] = provenance;
+      }
     }
     return result;
   }
@@ -201,6 +271,7 @@ class ThrowsCacheFile {
     if (offset + length > _bytes.length) return null;
     final keyLength = _data.getUint16(offset, Endian.little);
     final thrownCount = _data.getUint16(offset + 2, Endian.little);
+    final recordFlags = _data.getUint32(offset + 4, Endian.little);
     final keyStart = offset + 8;
     final keyEnd = keyStart + keyLength;
     if (keyEnd > _bytes.length) return null;
@@ -212,7 +283,41 @@ class ThrowsCacheFile {
       thrownOffsets.add(_data.getUint32(cursor, Endian.little));
       cursor += 4;
     }
-    return _ThrownRecord(key: key, thrownOffsets: thrownOffsets);
+    final provenanceOffsets = <List<_ProvenanceOffset>>[];
+    if ((recordFlags & _flagProvenance) != 0) {
+      for (var i = 0; i < thrownCount; i++) {
+        if (cursor + 4 > _bytes.length) {
+          provenanceOffsets.add(const <_ProvenanceOffset>[]);
+          continue;
+        }
+        final provCount = _data.getUint16(cursor, Endian.little);
+        cursor += 2;
+        cursor += 2; // reserved
+        final provList = <_ProvenanceOffset>[];
+        for (var j = 0; j < provCount; j++) {
+          if (cursor + 8 > _bytes.length) break;
+          final callOffset = _data.getUint32(cursor, Endian.little);
+          final originOffset = _data.getUint32(cursor + 4, Endian.little);
+          cursor += 8;
+          provList.add(
+            _ProvenanceOffset(
+              callOffset: callOffset,
+              originOffset: originOffset,
+            ),
+          );
+        }
+        provenanceOffsets.add(provList);
+      }
+    } else {
+      for (var i = 0; i < thrownCount; i++) {
+        provenanceOffsets.add(const <_ProvenanceOffset>[]);
+      }
+    }
+    return _ThrownRecord(
+      key: key,
+      thrownOffsets: thrownOffsets,
+      provenanceOffsets: provenanceOffsets,
+    );
   }
 
   List<String> _loadStrings() {
@@ -308,9 +413,21 @@ class _IndexRecord {
 class _ThrownRecord {
   final String key;
   final List<int> thrownOffsets;
+  final List<List<_ProvenanceOffset>> provenanceOffsets;
 
   _ThrownRecord({
     required this.key,
     required this.thrownOffsets,
+    required this.provenanceOffsets,
+  });
+}
+
+class _ProvenanceOffset {
+  final int callOffset;
+  final int originOffset;
+
+  const _ProvenanceOffset({
+    required this.callOffset,
+    required this.originOffset,
   });
 }

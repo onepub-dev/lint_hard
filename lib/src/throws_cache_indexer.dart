@@ -7,12 +7,12 @@ import 'package:analyzer/dart/element/type.dart';
 import 'document_thrown_exceptions.dart';
 import 'throws_cache.dart';
 
-Map<String, List<String>> buildThrowsIndex(
+Map<String, ThrowsCacheEntry> buildThrowsIndex(
   ResolvedLibraryResult library, {
   String? libraryUri,
 }) {
   final unitsByPath = _unitsByPath(library.units);
-  final entries = <String, List<String>>{};
+  final entries = <String, ThrowsCacheEntry>{};
   final visitor = _ExecutableIndexCollector(
     libraryUri ?? library.element.firstFragment.source.uri.toString(),
     unitsByPath,
@@ -29,7 +29,7 @@ Map<String, List<String>> buildThrowsIndex(
 class _ExecutableIndexCollector extends RecursiveAstVisitor<void> {
   final String libraryUri;
   final Map<String, CompilationUnit> unitsByPath;
-  final Map<String, List<String>> entries;
+  final Map<String, ThrowsCacheEntry> entries;
 
   _ExecutableIndexCollector(this.libraryUri, this.unitsByPath, this.entries);
 
@@ -66,34 +66,59 @@ class _ExecutableIndexCollector extends RecursiveAstVisitor<void> {
   }
 
   void _record(ExecutableElement element, FunctionBody body) {
-    final thrown = collectThrownTypeNames(
+    final infos = collectThrownTypeInfos(
       body,
       unitsByPath: unitsByPath,
+      includeLineNumbersForAll: true,
     );
-    if (thrown.isEmpty) return;
+    if (infos.isEmpty) return;
     final key = _keyForExecutable(element);
-    entries[key] = thrown.toList()..sort();
+    entries[key] = _entryForInfos(infos);
   }
 
   void _recordConstructor(ConstructorElement element, FunctionBody body) {
-    final thrown = collectThrownTypeNames(
+    final infos = collectThrownTypeInfos(
       body,
       unitsByPath: unitsByPath,
+      includeLineNumbersForAll: true,
     );
-    if (thrown.isEmpty) return;
+    if (infos.isEmpty) return;
     final key = _keyForConstructor(element);
-    entries[key] = thrown.toList()..sort();
+    entries[key] = _entryForInfos(infos);
+  }
+
+  ThrowsCacheEntry _entryForInfos(List<ThrownTypeInfo> infos) {
+    final provenance = <String, List<ThrowsProvenance>>{};
+    final dedupe = <String, Set<String>>{};
+    for (final info in infos) {
+      if (info.provenance.isEmpty) continue;
+      final list = provenance.putIfAbsent(info.name, () => <ThrowsProvenance>[]);
+      final seen = dedupe.putIfAbsent(info.name, () => <String>{});
+      for (final entry in info.provenance) {
+        final key = '${entry.call}|${entry.origin ?? ''}';
+        if (seen.add(key)) {
+          list.add(entry);
+        }
+      }
+    }
+    final thrown = infos.map((info) => info.name).toSet().toList()..sort();
+    return ThrowsCacheEntry(
+      thrown: thrown,
+      provenance: provenance,
+    );
   }
 
   String _keyForExecutable(ExecutableElement element) {
     final container = _containerName(element.enclosingElement);
     final name = element.name ?? '';
-    return ThrowsCacheKeyBuilder.build(
+    final baseKey = ThrowsCacheKeyBuilder.build(
       libraryUri: libraryUri,
       container: container,
       name: name,
       parameterTypes: _parameterTypes(element),
     );
+    final line = _lineNumberForElement(element);
+    return line == null ? baseKey : '$baseKey:$line';
   }
 
   String _keyForConstructor(ConstructorElement element) {
@@ -102,12 +127,14 @@ class _ExecutableIndexCollector extends RecursiveAstVisitor<void> {
     final ctorName = (ctorElementName == null || ctorElementName.isEmpty)
         ? className
         : '$className.$ctorElementName';
-    return ThrowsCacheKeyBuilder.build(
+    final baseKey = ThrowsCacheKeyBuilder.build(
       libraryUri: libraryUri,
       container: className,
       name: ctorName,
       parameterTypes: _parameterTypes(element),
     );
+    final line = _lineNumberForElement(element);
+    return line == null ? baseKey : '$baseKey:$line';
   }
 
   String _containerName(Element? element) {
@@ -127,6 +154,14 @@ class _ExecutableIndexCollector extends RecursiveAstVisitor<void> {
   String _typeDisplayName(DartType type) {
     if (type is VoidType) return 'void';
     return type.getDisplayString();
+  }
+
+  int? _lineNumberForElement(ExecutableElement element) {
+    final source = element.library.firstFragment.source;
+    final unit = unitsByPath[source.fullName];
+    if (unit == null) return null;
+    final offset = element.firstFragment.offset;
+    return unit.lineInfo.getLocation(offset).lineNumber;
   }
 }
 

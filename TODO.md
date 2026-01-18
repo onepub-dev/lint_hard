@@ -97,6 +97,12 @@ class MyYaml {
  also resets our indicies - can we safely store index in the existing package
  directory?
 
+ - [] Do we need to document what a lambda throws? How would we do this.
+
+ - [] when parsing external packages we should be able to recognize our own
+ @Throws declaration.  The questions is do we trust these or should we still
+ do our own inspections?
+
  - [x] document the use of 'peek definition' in vs-code to see the annotations.
 
   - [] When a library is a 'part of' another library the imports have to be

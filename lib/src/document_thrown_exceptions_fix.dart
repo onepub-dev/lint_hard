@@ -52,10 +52,17 @@ class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
     final importData = _collectImportPrefixes(unitResult.unit);
     final sortedMissing = missingInfos.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
-    final lines = [
-      for (final info in sortedMissing)
-        '@Throws(${_formatThrownType(info, importData, libraryUri)})',
-    ];
+    final lines = <String>[];
+    for (final info in sortedMissing) {
+      lines.addAll(
+        _formatThrownAnnotations(
+          info,
+          importData,
+          libraryUri,
+          includeSource: false,
+        ),
+      );
+    }
 
     await builder.addDartFileEdit(file, (builder) {
       if (!_hasThrowsImport(unitResult.unit)) {
@@ -274,6 +281,28 @@ _ImportPrefixData _collectImportPrefixes(CompilationUnit unit) {
   );
 }
 
+List<String> _formatThrownAnnotations(
+  ThrownTypeInfo info,
+  _ImportPrefixData importData,
+  String libraryUri, {
+  required bool includeSource,
+}) {
+  final renderedType = _formatThrownType(info, importData, libraryUri);
+  if (!includeSource || info.provenance.isEmpty) {
+    return ['@Throws($renderedType)'];
+  }
+  final lines = <String>[];
+  for (final provenance in info.provenance) {
+    final buffer = StringBuffer(renderedType);
+    buffer.write(", call: '${_escapeSourceString(provenance.call)}'");
+    if (provenance.origin != null) {
+      buffer.write(", origin: '${_escapeSourceString(provenance.origin!)}'");
+    }
+    lines.add('@Throws($buffer)');
+  }
+  return lines;
+}
+
 String _formatThrownType(
   ThrownTypeInfo info,
   _ImportPrefixData importData,
@@ -301,6 +330,10 @@ String _formatThrownType(
     }
   }
   return info.name;
+}
+
+String _escapeSourceString(String value) {
+  return value.replaceAll('\\', r'\\').replaceAll("'", r"\'");
 }
 
 String? _libraryUriForType(DartType? type) {

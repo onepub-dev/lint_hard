@@ -58,7 +58,7 @@ packages:
         '1.2.3.throws',
       ));
       ThrowsCacheWriter.writeFileSync(cacheFile, {
-        'key': ['BadStateException'],
+        'key': ThrowsCacheEntry(thrown: ['BadStateException']),
       });
 
       final lookup = ThrowsCacheLookup.forProjectRootWithCache(
@@ -124,7 +124,7 @@ packages:
         '$sdkVersion.throws',
       ));
       ThrowsCacheWriter.writeFileSync(sdkFile, {
-        'key': ['BadStateException'],
+        'key': ThrowsCacheEntry(thrown: ['BadStateException']),
       });
 
       final lookup = ThrowsCacheLookup.forProjectRootWithCache(
@@ -154,7 +154,7 @@ packages:
         '3.3.0.throws',
       ));
       ThrowsCacheWriter.writeFileSync(flutterFile, {
-        'key': ['BadStateException'],
+        'key': ThrowsCacheEntry(thrown: ['BadStateException']),
       });
 
       final lookup = ThrowsCacheLookup(

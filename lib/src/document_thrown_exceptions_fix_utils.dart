@@ -8,12 +8,14 @@ import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:path/path.dart' as p;
 
 import 'document_thrown_exceptions.dart';
+import 'throws_cache.dart';
 import 'throws_cache_lookup.dart';
 
 List<SourceEdit> documentThrownExceptionEdits(
   ResolvedUnitResult unitResult,
   Iterable<ResolvedUnitResult> libraryUnits, {
   ThrowsCacheLookup? externalLookup,
+  bool includeSource = false,
 }) {
   final unitsByPath = unitsByPathFromResolvedUnits(libraryUnits);
   final collector = _ExecutableCollector();
@@ -23,24 +25,52 @@ List<SourceEdit> documentThrownExceptionEdits(
   final edits = <SourceEdit>[];
   var hasImport = _hasThrowsImport(unitResult.unit);
   for (final target in collector.targets) {
-    final missingInfos = missingThrownTypeInfos(
-      target.body,
-      target.metadata,
-      unitsByPath: unitsByPath,
-      externalLookup: externalLookup,
-    );
-    if (missingInfos.isEmpty) continue;
+    final thrownInfos = includeSource
+        ? _mergeThrownInfos(
+            collectThrownTypeInfos(
+              target.body,
+              unitsByPath: unitsByPath,
+              externalLookup: externalLookup,
+            ),
+          )
+        : missingThrownTypeInfos(
+            target.body,
+            target.metadata,
+            unitsByPath: unitsByPath,
+            externalLookup: externalLookup,
+          );
+    if (thrownInfos.isEmpty) continue;
 
     final insertOffset = _annotationInsertOffset(content, target);
     final indent = indentAtOffset(content, target.declarationOffset);
     final libraryUri = unitResult.libraryFragment.source.uri.toString();
     final importData = _collectImportPrefixes(unitResult.unit);
-    final sortedMissing = missingInfos.toList()
+    final sortedMissing = thrownInfos.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
-    final lines = [
-      for (final info in sortedMissing)
-        '@Throws(${_formatThrownType(info, importData, libraryUri)})',
-    ];
+    final reasonByType = includeSource
+        ? _annotationReasonByType(target.metadata)
+        : const <String, String>{};
+    if (includeSource) {
+      edits.addAll(
+        _removeThrowsAnnotations(
+          content,
+          target.metadata,
+          sortedMissing.map((info) => info.name).toSet(),
+        ),
+      );
+    }
+    final lines = <String>[];
+    for (final info in sortedMissing) {
+      lines.addAll(
+        _formatThrownAnnotations(
+          info,
+          importData,
+          libraryUri,
+          includeSource: includeSource,
+          reasonSource: reasonByType[info.name],
+        ),
+      );
+    }
     edits.add(
       SourceEdit(insertOffset, 0, '$indent${lines.join("\n$indent")}\n'),
     );
@@ -242,6 +272,111 @@ int _annotationInsertOffset(String content, ExecutableTarget target) {
   return _lineOffsetAfter(content, comment.end);
 }
 
+List<SourceEdit> _removeThrowsAnnotations(
+  String content,
+  NodeList<Annotation>? metadata,
+  Set<String> replaceNames,
+) {
+  if (metadata == null || metadata.isEmpty) return const <SourceEdit>[];
+  final edits = <SourceEdit>[];
+  for (final annotation in metadata) {
+    if (_annotationName(annotation) != 'Throws') continue;
+    final typeName = _annotationTypeName(annotation);
+    if (typeName == null || !replaceNames.contains(typeName)) continue;
+    final start = lineStart(content, annotation.offset);
+    final end = _lineOffsetAfter(content, annotation.end);
+    if (end > start) {
+      edits.add(SourceEdit(start, end - start, ''));
+    }
+  }
+  return edits;
+}
+
+String? _annotationName(Annotation annotation) {
+  final name = annotation.name;
+  if (name is SimpleIdentifier) return name.name;
+  if (name is PrefixedIdentifier) return name.identifier.name;
+  return null;
+}
+
+String? _annotationTypeName(Annotation annotation) {
+  final args = annotation.arguments?.arguments;
+  if (args == null || args.isEmpty) return null;
+  final first = args.first;
+  if (first is ListLiteral) return null;
+  return _normalizeTypeName(first.toSource());
+}
+
+String? _normalizeTypeName(String rawName) {
+  var name = rawName.trim();
+  if (name.isEmpty) return null;
+
+  if (name.endsWith('?')) {
+    name = name.substring(0, name.length - 1);
+  }
+
+  final genericSplit = name.split('<');
+  name = genericSplit.first;
+
+  final dotIndex = name.lastIndexOf('.');
+  if (dotIndex != -1) {
+    name = name.substring(dotIndex + 1);
+  }
+
+  return name;
+}
+
+Map<String, String> _annotationReasonByType(
+  NodeList<Annotation>? metadata,
+) {
+  if (metadata == null || metadata.isEmpty) return const <String, String>{};
+  final map = <String, String>{};
+  for (final annotation in metadata) {
+    if (_annotationName(annotation) != 'Throws') continue;
+    final name = _annotationTypeName(annotation);
+    if (name == null) continue;
+    final args = annotation.arguments?.arguments;
+    if (args == null) continue;
+    for (final arg in args) {
+      if (arg is! NamedExpression) continue;
+      if (arg.name.label.name != 'reason') continue;
+      map[name] = arg.expression.toSource();
+    }
+  }
+  return map;
+}
+
+List<ThrownTypeInfo> _mergeThrownInfos(List<ThrownTypeInfo> infos) {
+  final byName = <String, ThrownTypeInfo>{};
+  for (final info in infos) {
+    final existing = byName[info.name];
+    if (existing == null) {
+      byName[info.name] = info;
+      continue;
+    }
+    final mergedType = existing.type ?? info.type;
+    final mergedProvenance = <ThrowsProvenance>[
+      ...existing.provenance,
+    ];
+    final seen = <String>{};
+    for (final entry in mergedProvenance) {
+      seen.add('${entry.call}|${entry.origin ?? ''}');
+    }
+    for (final entry in info.provenance) {
+      final key = '${entry.call}|${entry.origin ?? ''}';
+      if (seen.add(key)) {
+        mergedProvenance.add(entry);
+      }
+    }
+    byName[info.name] = ThrownTypeInfo(
+      info.name,
+      mergedType,
+      provenance: mergedProvenance,
+    );
+  }
+  return byName.values.toList();
+}
+
 String _importText(
   String content,
   int insertAt, {
@@ -343,6 +478,35 @@ _ImportPrefixData _collectImportPrefixes(CompilationUnit unit) {
   );
 }
 
+List<String> _formatThrownAnnotations(
+  ThrownTypeInfo info,
+  _ImportPrefixData importData,
+  String libraryUri, {
+  required bool includeSource,
+  String? reasonSource,
+}) {
+  final renderedType = _formatThrownType(info, importData, libraryUri);
+  if (!includeSource || info.provenance.isEmpty) {
+    if (reasonSource == null) {
+      return ['@Throws($renderedType)'];
+    }
+    return ['@Throws($renderedType, reason: $reasonSource)'];
+  }
+  final lines = <String>[];
+  for (final provenance in info.provenance) {
+    final buffer = StringBuffer(renderedType);
+    if (reasonSource != null) {
+      buffer.write(', reason: $reasonSource');
+    }
+    buffer.write(", call: '${_escapeSourceString(provenance.call)}'");
+    if (provenance.origin != null) {
+      buffer.write(", origin: '${_escapeSourceString(provenance.origin!)}'");
+    }
+    lines.add('@Throws($buffer)');
+  }
+  return lines;
+}
+
 String _formatThrownType(
   ThrownTypeInfo info,
   _ImportPrefixData importData,
@@ -370,6 +534,10 @@ String _formatThrownType(
     }
   }
   return info.name;
+}
+
+String _escapeSourceString(String value) {
+  return value.replaceAll('\\', r'\\').replaceAll("'", r"\'");
 }
 
 String? _libraryUriForType(DartType? type) {
