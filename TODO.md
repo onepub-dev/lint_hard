@@ -88,8 +88,8 @@ class MyYaml {
   don't use RegEx as an example. 
 
 
- - [] move the throws lint and associated tooling into its own package document_throws.
- the @Throws annotation should be placed in its own package as its needed for 
+ - [x] move the throws lint and associated tooling into its own package document_throws.
+ - [] the @Throws annotation should be placed in its own package as its needed for 
  production code not just a dev dependency - is there any advantage to this, 
  we still get dev conflicts.
 

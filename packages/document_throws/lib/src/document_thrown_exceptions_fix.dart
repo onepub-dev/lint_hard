@@ -1,0 +1,396 @@
+import 'package:analysis_server_plugin/edit/dart/correction_producer.dart';
+import 'package:analysis_server_plugin/edit/dart/dart_fix_kind_priority.dart';
+import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
+import 'package:analyzer_plugin/utilities/fixes/fixes.dart';
+
+import 'document_thrown_exceptions.dart';
+import 'document_thrown_exceptions_fix_utils.dart';
+import 'throws_cache_lookup.dart';
+
+class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
+  static const FixKind _fixKind = FixKind(
+    'document_throws.fix.document_thrown_exceptions',
+    DartFixKindPriority.standard,
+    'Document thrown exceptions',
+  );
+
+  // Wire the fix into the analysis server context.
+  DocumentThrownExceptionsFix({required super.context});
+
+  @override
+  // Apply within a single file without needing broader analysis.
+  CorrectionApplicability get applicability =>
+      CorrectionApplicability.acrossSingleFile;
+
+  @override
+  // Expose the fix kind identifier for this lint.
+  FixKind get fixKind => _fixKind;
+
+  @override
+  // Insert missing @Throws annotations for the reported executable.
+  Future<void> compute(ChangeBuilder builder) async {
+    if (diagnostic?.diagnosticCode != DocumentThrownExceptions.code) return;
+
+    final target = findExecutableTarget(node);
+    if (target == null) return;
+
+    final missingInfos = missingThrownTypeInfos(
+      target.body,
+      target.metadata,
+      unitsByPath: unitsByPathFromResolvedUnits(libraryResult.units),
+      externalLookup: _externalLookupForPath(file),
+    );
+    if (missingInfos.isEmpty) return;
+
+    final content = unitResult.content;
+    final insertOffset = _annotationInsertOffset(content, target);
+    final indent = indentAtOffset(content, target.declarationOffset);
+
+    final libraryUri = unitResult.libraryFragment.source.uri.toString();
+    final importTarget = _importTargetUnit(unitResult, libraryResult.units);
+    final importData = _collectImportPrefixes(importTarget.unit);
+    final sortedMissing = missingInfos.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    final lines = <String>[];
+    for (final info in sortedMissing) {
+      lines.addAll(
+        _formatThrownAnnotations(
+          info,
+          importData,
+          libraryUri,
+          includeSource: false,
+        ),
+      );
+    }
+
+    await builder.addDartFileEdit(file, (builder) {
+      builder.addSimpleInsertion(
+        insertOffset,
+        '$indent${lines.join("\n$indent")}\n',
+      );
+    });
+    if (!_hasThrowsImport(importTarget.unit)) {
+      final insertion = _importInsertion(
+        importTarget.unit,
+        importTarget.content,
+      );
+      await builder.addDartFileEdit(importTarget.path, (builder) {
+        builder.addSimpleInsertion(insertion.offset, insertion.text);
+      });
+    }
+  }
+}
+
+bool _hasThrowsImport(CompilationUnit unit) {
+  for (final directive in unit.directives) {
+    if (directive is ImportDirective &&
+        directive.uri.stringValue == 'package:document_throws/throws.dart') {
+      return true;
+    }
+  }
+  return false;
+}
+
+class _ImportInsertion {
+  final int offset;
+  final String text;
+
+  const _ImportInsertion(this.offset, this.text);
+}
+
+int _importGroupForUri(String uri) {
+  if (uri.startsWith('dart:')) return 0;
+  if (uri.startsWith('package:')) return 1;
+  return 2;
+}
+
+_ImportInsertion _importInsertion(CompilationUnit unit, String content) {
+  const newUri = 'package:document_throws/throws.dart';
+  final newGroup = _importGroupForUri(newUri);
+  final imports = <_ImportInfo>[];
+  for (final directive in unit.directives) {
+    if (directive is ImportDirective) {
+      final uri = directive.uri.stringValue;
+      if (uri == null) continue;
+      imports.add(_ImportInfo(directive, uri, _importGroupForUri(uri)));
+    }
+  }
+
+  if (imports.isNotEmpty) {
+    _ImportInfo? previous;
+    for (final info in imports) {
+      final groupCmp = newGroup.compareTo(info.group);
+      if (groupCmp < 0 ||
+          (groupCmp == 0 && newUri.compareTo(info.uri) < 0)) {
+        final insertAt = (groupCmp < 0 && previous != null)
+            ? previous.directive.end
+            : info.directive.offset;
+        final text = _importText(
+          content,
+          insertAt,
+          nextGroup: info.group,
+          nextOffset: info.directive.offset,
+          newGroup: newGroup,
+        );
+        return _ImportInsertion(insertAt, text);
+      }
+      previous = info;
+    }
+
+    final insertAt = imports.last.directive.end;
+    final text = _importText(content, insertAt);
+    return _ImportInsertion(insertAt, text);
+  }
+
+  ImportDirective? lastImport;
+  LibraryDirective? library;
+  PartDirective? firstPart;
+  for (final directive in unit.directives) {
+    if (directive is ImportDirective) lastImport = directive;
+    if (directive is LibraryDirective && library == null) {
+      library = directive;
+    }
+    if (directive is PartDirective && firstPart == null) {
+      firstPart = directive;
+    }
+  }
+
+  if (lastImport != null) {
+    final insertAt = lastImport.end;
+    final text = _importText(content, insertAt);
+    return _ImportInsertion(insertAt, text);
+  }
+  if (library != null) {
+    final insertAt = library.end;
+    final text = _importText(content, insertAt);
+    return _ImportInsertion(insertAt, text);
+  }
+  if (firstPart != null) {
+    final insertAt = firstPart.offset;
+    final text = _importText(content, insertAt);
+    return _ImportInsertion(insertAt, text);
+  }
+  return _ImportInsertion(0, _importText(content, 0));
+}
+
+ResolvedUnitResult _importTargetUnit(
+  ResolvedUnitResult unitResult,
+  Iterable<ResolvedUnitResult> libraryUnits,
+) {
+  if (!_isPartUnit(unitResult.unit)) return unitResult;
+  for (final unit in libraryUnits) {
+    if (_hasLibraryDirective(unit.unit)) return unit;
+  }
+  for (final unit in libraryUnits) {
+    if (!_isPartUnit(unit.unit)) return unit;
+  }
+  return unitResult;
+}
+
+bool _isPartUnit(CompilationUnit unit) {
+  return unit.directives.any((d) => d is PartOfDirective);
+}
+
+bool _hasLibraryDirective(CompilationUnit unit) {
+  return unit.directives.any((d) => d is LibraryDirective);
+}
+
+String _importText(
+  String content,
+  int insertAt, {
+  int? nextGroup,
+  int? nextOffset,
+  int? newGroup,
+}) {
+  final needsLeadingNewline =
+      insertAt > 0 && !_isLineBreak(content.codeUnitAt(insertAt - 1));
+  final prefix = needsLeadingNewline ? '\n' : '';
+  final needsGroupSpacing = nextGroup != null &&
+      newGroup != null &&
+      nextGroup != newGroup &&
+      nextOffset != null &&
+      _lineBreakCount(content, insertAt, nextOffset) < 2;
+  final suffix = needsGroupSpacing ? '\n' : '';
+  return "${prefix}import 'package:document_throws/throws.dart';\n$suffix";
+}
+
+bool _isLineBreak(int codeUnit) => codeUnit == 0x0A || codeUnit == 0x0D;
+
+int _annotationInsertOffset(String content, ExecutableTarget target) {
+  if (target.metadata != null && target.metadata!.isNotEmpty) {
+    return _lineOffsetAfter(content, target.metadata!.last.end);
+  }
+
+  final comment = target.documentationComment;
+  if (comment == null) return lineStart(content, target.declarationOffset);
+
+  return _lineOffsetAfter(content, comment.end);
+}
+
+int _lineBreakCount(String content, int start, int end) {
+  var count = 0;
+  var i = start;
+  while (i < end) {
+    final cu = content.codeUnitAt(i);
+    if (cu == 0x0A) {
+      count++;
+    } else if (cu == 0x0D) {
+      count++;
+      if (i + 1 < end && content.codeUnitAt(i + 1) == 0x0A) {
+        i++;
+      }
+    }
+    i++;
+  }
+  return count;
+}
+
+int _lineOffsetAfter(String content, int offset) {
+  var i = offset;
+  while (i < content.length && !_isLineBreak(content.codeUnitAt(i))) {
+    i++;
+  }
+
+  if (i < content.length && content.codeUnitAt(i) == 0x0D) {
+    i++;
+    if (i < content.length && content.codeUnitAt(i) == 0x0A) {
+      i++;
+    }
+  } else if (i < content.length && content.codeUnitAt(i) == 0x0A) {
+    i++;
+  }
+  return i;
+}
+
+class _ImportPrefixData {
+  final Map<String, String> prefixed;
+  final Set<String> unprefixed;
+  final Map<String, String> prefixedPackages;
+  final Set<String> unprefixedPackages;
+
+  const _ImportPrefixData(
+    this.prefixed,
+    this.unprefixed,
+    this.prefixedPackages,
+    this.unprefixedPackages,
+  );
+}
+
+_ImportPrefixData _collectImportPrefixes(CompilationUnit unit) {
+  final prefixed = <String, String>{};
+  final unprefixed = <String>{};
+  final prefixedPackages = <String, String>{};
+  final unprefixedPackages = <String>{};
+  for (final directive in unit.directives) {
+    if (directive is! ImportDirective) continue;
+    final uri = directive.uri.stringValue;
+    if (uri == null || uri.isEmpty) continue;
+    final prefix = directive.prefix?.name;
+    final package = _packageName(uri);
+    if (prefix != null && prefix.isNotEmpty) {
+      prefixed[uri] = prefix;
+      if (package != null && package.isNotEmpty) {
+        prefixedPackages.putIfAbsent(package, () => prefix);
+      }
+    } else {
+      unprefixed.add(uri);
+      if (package != null && package.isNotEmpty) {
+        unprefixedPackages.add(package);
+      }
+    }
+  }
+  return _ImportPrefixData(
+    prefixed,
+    unprefixed,
+    prefixedPackages,
+    unprefixedPackages,
+  );
+}
+
+List<String> _formatThrownAnnotations(
+  ThrownTypeInfo info,
+  _ImportPrefixData importData,
+  String libraryUri, {
+  required bool includeSource,
+}) {
+  final renderedType = _formatThrownType(info, importData, libraryUri);
+  if (!includeSource || info.provenance.isEmpty) {
+    return ['@Throws($renderedType)'];
+  }
+  final lines = <String>[];
+  for (final provenance in info.provenance) {
+    final buffer = StringBuffer(renderedType);
+    buffer.write(", call: '${_escapeSourceString(provenance.call)}'");
+    if (provenance.origin != null) {
+      buffer.write(", origin: '${_escapeSourceString(provenance.origin!)}'");
+    }
+    lines.add('@Throws($buffer)');
+  }
+  return lines;
+}
+
+String _formatThrownType(
+  ThrownTypeInfo info,
+  _ImportPrefixData importData,
+  String libraryUri,
+) {
+  final typeUri = _libraryUriForType(info.type);
+  if (typeUri == null || typeUri == libraryUri) {
+    return info.name;
+  }
+  if (importData.unprefixed.contains(typeUri)) {
+    return info.name;
+  }
+  final prefix = importData.prefixed[typeUri];
+  if (prefix != null && prefix.isNotEmpty) {
+    return '$prefix.${info.name}';
+  }
+  final typePackage = _packageName(typeUri);
+  if (typePackage != null) {
+    if (importData.unprefixedPackages.contains(typePackage)) {
+      return info.name;
+    }
+    final packagePrefix = importData.prefixedPackages[typePackage];
+    if (packagePrefix != null && packagePrefix.isNotEmpty) {
+      return '$packagePrefix.${info.name}';
+    }
+  }
+  return info.name;
+}
+
+String _escapeSourceString(String value) {
+  return value.replaceAll('\\', r'\\').replaceAll("'", r"\'");
+}
+
+String? _libraryUriForType(DartType? type) {
+  if (type is InterfaceType) {
+    final uri = type.element.library.firstFragment.source.uri;
+    return uri.toString();
+  }
+  return null;
+}
+
+String? _packageName(String uri) {
+  if (!uri.startsWith('package:')) return null;
+  final trimmed = uri.substring('package:'.length);
+  final slash = trimmed.indexOf('/');
+  if (slash == -1) return trimmed;
+  return trimmed.substring(0, slash);
+}
+
+class _ImportInfo {
+  final ImportDirective directive;
+  final String uri;
+  final int group;
+
+  const _ImportInfo(this.directive, this.uri, this.group);
+}
+
+ThrowsCacheLookup? _externalLookupForPath(String filePath) {
+  final root = findProjectRoot(filePath);
+  if (root == null) return null;
+  return ThrowsCacheLookup.forProjectRoot(root);
+}

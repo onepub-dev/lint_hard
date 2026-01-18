@@ -1,0 +1,19 @@
+name: document_throws
+version: 0.1.0
+homepage: https://github.com/noojee/lint_hard.git
+description: Document thrown exceptions via @Throws annotations.
+repository: https://github.com/noojee/lint_hard.git
+environment:
+  sdk: '>=3.7.0 <4.0.0'
+dependencies:
+  analyzer: ^9.0.0
+  analyzer_plugin: ^0.13.11
+  analysis_server_plugin: ^0.3.4
+  glob: ^2.1.2
+  path: ^1.9.0
+  yaml: ^3.1.2
+dev_dependencies:
+  test: ^1.25.0
+executables:
+  document_throws_fix: dt-fix
+  document_throws_index: dt-index
