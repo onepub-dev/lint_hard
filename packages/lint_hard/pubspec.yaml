@@ -5,6 +5,9 @@ description: All the lints except where they clash.
 repository: https://github.com/noojee/lint_hard.git
 environment:
   sdk: '>=3.7.0 <4.0.0'
+
+resolution: workspace
+  
 dependencies:
   analyzer: ^9.0.0
   analyzer_plugin: ^0.13.11

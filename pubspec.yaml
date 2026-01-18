@@ -3,4 +3,5 @@ publish_to: none
 environment:
   sdk: '>=3.7.0 <4.0.0'
 workspace:
-  - packages/*
+  - packages/document_throws
+  - packages/lint_hard
