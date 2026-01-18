@@ -66,22 +66,25 @@ Future<void> main(List<String> args) async {
             rootPath,
             () => ThrowsCacheLookup.forProjectRoot(rootPath),
           );
-    final edits = documentThrownExceptionEdits(
+    final editsByFile = documentThrownExceptionEdits(
       unitResult,
       libraryResult.units,
       externalLookup: externalLookup,
       includeSource: includeSource,
     );
-    if (edits.isEmpty) continue;
+    if (editsByFile.isEmpty) continue;
 
-    edits.sort((a, b) => b.offset.compareTo(a.offset));
-    editsByPath[filePath] = edits;
+    for (final entry in editsByFile.entries) {
+      editsByPath.putIfAbsent(entry.key, () => <SourceEdit>[])
+        ..addAll(entry.value);
+    }
   }
 
   var updatedCount = 0;
   for (final entry in editsByPath.entries) {
+    final edits = entry.value..sort((a, b) => b.offset.compareTo(a.offset));
     final content = await File(entry.key).readAsString();
-    final updated = SourceEdit.applySequence(content, entry.value);
+    final updated = SourceEdit.applySequence(content, edits);
     if (updated != content) {
       await File(entry.key).writeAsString(updated);
       updatedCount++;

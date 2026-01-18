@@ -1,5 +1,6 @@
 import 'package:analysis_server_plugin/edit/dart/correction_producer.dart';
 import 'package:analysis_server_plugin/edit/dart/dart_fix_kind_priority.dart';
+import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
@@ -49,7 +50,8 @@ class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
     final indent = indentAtOffset(content, target.declarationOffset);
 
     final libraryUri = unitResult.libraryFragment.source.uri.toString();
-    final importData = _collectImportPrefixes(unitResult.unit);
+    final importTarget = _importTargetUnit(unitResult, libraryResult.units);
+    final importData = _collectImportPrefixes(importTarget.unit);
     final sortedMissing = missingInfos.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
     final lines = <String>[];
@@ -65,15 +67,20 @@ class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
     }
 
     await builder.addDartFileEdit(file, (builder) {
-      if (!_hasThrowsImport(unitResult.unit)) {
-        final insertion = _importInsertion(unitResult.unit, content);
-        builder.addSimpleInsertion(insertion.offset, insertion.text);
-      }
       builder.addSimpleInsertion(
         insertOffset,
         '$indent${lines.join("\n$indent")}\n',
       );
     });
+    if (!_hasThrowsImport(importTarget.unit)) {
+      final insertion = _importInsertion(
+        importTarget.unit,
+        importTarget.content,
+      );
+      await builder.addDartFileEdit(importTarget.path, (builder) {
+        builder.addSimpleInsertion(insertion.offset, insertion.text);
+      });
+    }
   }
 }
 
@@ -167,6 +174,28 @@ _ImportInsertion _importInsertion(CompilationUnit unit, String content) {
     return _ImportInsertion(insertAt, text);
   }
   return _ImportInsertion(0, _importText(content, 0));
+}
+
+ResolvedUnitResult _importTargetUnit(
+  ResolvedUnitResult unitResult,
+  Iterable<ResolvedUnitResult> libraryUnits,
+) {
+  if (!_isPartUnit(unitResult.unit)) return unitResult;
+  for (final unit in libraryUnits) {
+    if (_hasLibraryDirective(unit.unit)) return unit;
+  }
+  for (final unit in libraryUnits) {
+    if (!_isPartUnit(unit.unit)) return unit;
+  }
+  return unitResult;
+}
+
+bool _isPartUnit(CompilationUnit unit) {
+  return unit.directives.any((d) => d is PartOfDirective);
+}
+
+bool _hasLibraryDirective(CompilationUnit unit) {
+  return unit.directives.any((d) => d is LibraryDirective);
 }
 
 String _importText(

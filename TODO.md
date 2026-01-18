@@ -35,7 +35,7 @@ a call the linter will warn you about new exceptions that are thrown.
 - [x] AFter adding a Throws annotation the method is still show the missing
 exception lint.
 
-- [] there is a question around the source of a throws clause. 
+- [x] there is a question around the source of a throws clause. 
 If we document a throws because a called method in an external package
 throws (but doesn't document that it throws) the the user may be left
 wondering where the source of the throws is. 

@@ -11,7 +11,7 @@ import 'document_thrown_exceptions.dart';
 import 'throws_cache.dart';
 import 'throws_cache_lookup.dart';
 
-List<SourceEdit> documentThrownExceptionEdits(
+Map<String, List<SourceEdit>> documentThrownExceptionEdits(
   ResolvedUnitResult unitResult,
   Iterable<ResolvedUnitResult> libraryUnits, {
   ThrowsCacheLookup? externalLookup,
@@ -22,8 +22,9 @@ List<SourceEdit> documentThrownExceptionEdits(
   unitResult.unit.accept(collector);
 
   final content = unitResult.content;
-  final edits = <SourceEdit>[];
-  var hasImport = _hasThrowsImport(unitResult.unit);
+  final editsByPath = <String, List<SourceEdit>>{};
+  final importTarget = _importTargetUnit(unitResult, libraryUnits);
+  var hasImport = _hasThrowsImport(importTarget.unit);
   for (final target in collector.targets) {
     final thrownInfos = includeSource
         ? _mergeThrownInfos(
@@ -35,23 +36,25 @@ List<SourceEdit> documentThrownExceptionEdits(
           )
         : missingThrownTypeInfos(
             target.body,
-            target.metadata,
-            unitsByPath: unitsByPath,
-            externalLookup: externalLookup,
-          );
+      target.metadata,
+      unitsByPath: unitsByPath,
+      externalLookup: externalLookup,
+    );
     if (thrownInfos.isEmpty) continue;
 
     final insertOffset = _annotationInsertOffset(content, target);
     final indent = indentAtOffset(content, target.declarationOffset);
     final libraryUri = unitResult.libraryFragment.source.uri.toString();
-    final importData = _collectImportPrefixes(unitResult.unit);
+    final importData = _collectImportPrefixes(importTarget.unit);
     final sortedMissing = thrownInfos.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
     final reasonByType = includeSource
         ? _annotationReasonByType(target.metadata)
         : const <String, String>{};
     if (includeSource) {
-      edits.addAll(
+      _addEdits(
+        editsByPath,
+        unitResult.path,
         _removeThrowsAnnotations(
           content,
           target.metadata,
@@ -71,17 +74,26 @@ List<SourceEdit> documentThrownExceptionEdits(
         ),
       );
     }
-    edits.add(
+    _addEdit(
+      editsByPath,
+      unitResult.path,
       SourceEdit(insertOffset, 0, '$indent${lines.join("\n$indent")}\n'),
     );
     if (!hasImport) {
-      final insertion = _importInsertion(unitResult.unit, content);
-      edits.add(SourceEdit(insertion.offset, 0, insertion.text));
+      final insertion = _importInsertion(
+        importTarget.unit,
+        importTarget.content,
+      );
+      _addEdit(
+        editsByPath,
+        importTarget.path,
+        SourceEdit(insertion.offset, 0, insertion.text),
+      );
       hasImport = true;
     }
   }
 
-  return edits;
+  return editsByPath;
 }
 
 ExecutableTarget? findExecutableTarget(AstNode node) {
@@ -156,6 +168,45 @@ class ExecutableTarget {
     required this.declarationOffset,
     required this.documentationComment,
   });
+}
+
+void _addEdits(
+  Map<String, List<SourceEdit>> editsByPath,
+  String path,
+  List<SourceEdit> edits,
+) {
+  if (edits.isEmpty) return;
+  editsByPath.putIfAbsent(path, () => <SourceEdit>[]).addAll(edits);
+}
+
+void _addEdit(
+  Map<String, List<SourceEdit>> editsByPath,
+  String path,
+  SourceEdit edit,
+) {
+  editsByPath.putIfAbsent(path, () => <SourceEdit>[]).add(edit);
+}
+
+ResolvedUnitResult _importTargetUnit(
+  ResolvedUnitResult unitResult,
+  Iterable<ResolvedUnitResult> libraryUnits,
+) {
+  if (!_isPartUnit(unitResult.unit)) return unitResult;
+  for (final unit in libraryUnits) {
+    if (_hasLibraryDirective(unit.unit)) return unit;
+  }
+  for (final unit in libraryUnits) {
+    if (!_isPartUnit(unit.unit)) return unit;
+  }
+  return unitResult;
+}
+
+bool _isPartUnit(CompilationUnit unit) {
+  return unit.directives.any((d) => d is PartOfDirective);
+}
+
+bool _hasLibraryDirective(CompilationUnit unit) {
+  return unit.directives.any((d) => d is LibraryDirective);
 }
 
 String? findProjectRoot(String filePath) {
