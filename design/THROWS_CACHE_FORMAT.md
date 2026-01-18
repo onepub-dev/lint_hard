@@ -89,7 +89,7 @@ offset size  name
 ```
 
 The header contains the same offsets as the footer to allow a single read at
-either end of the file.
+either end of the file. `data_offset` is only stored in the header.
 
 ## Index Records (fixed size, 32 bytes)
 Index records are sorted by `key_hash` to allow binary search.
@@ -118,8 +118,8 @@ offset size  name
 8+N    4*M   thrown_type_string_offsets (u32 offsets into string table)
 ```
 
-`key_length` counts UTF-8 bytes in `key_bytes`. `thrown_count` is the number
-of thrown types. Each thrown type is an offset into the string table.
+`key_length` counts UTF-8 bytes in `key_bytes`. `thrown_count` is `M`, the
+number of thrown types. Each thrown type is an offset into the string table.
 
 If `record_flags & 0x01` is set, append provenance blocks for each thrown type:
 
@@ -142,8 +142,20 @@ offset size  name
 4+4K   ...   string_data (UTF-8, NUL-terminated)
 ```
 
-Strings are NUL-terminated for easy scanning. Offsets are relative to the
-start of `string_data`.
+`K` is `string_count`. Strings are NUL-terminated for easy scanning. Offsets
+are relative to the start of `string_data`.
+
+Example:
+
+```
+string_count = 3
+string_offsets = [0, 5, 10]
+string_data = "Foo\0Bar\0Baz\0"
+
+index 0 -> "Foo"
+index 1 -> "Bar"
+index 2 -> "Baz"
+```
 
 ## Keys
 Keys uniquely identify an executable element.
@@ -158,9 +170,10 @@ Examples:
 
 ```
 package:foo/foo.dart|Foo#bar(int,String)
-dart:core|RegExp#RegExp(String,bool,bool,bool,bool)
+dart:io|File#readAsString(String,Encoding?)
 ```
 
+`<container>` is the owning type name (class, mixin, extension, or interface).
 For top-level functions, use `<container>` as `_`:
 
 ```
