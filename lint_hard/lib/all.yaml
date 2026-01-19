@@ -180,7 +180,7 @@ linter:
     sort_constructors_first : false
     sort_pub_dependencies : true
     sort_unnamed_constructors_first : true
-    specify_nonobvious_local_variable_types : false
+    specify_nonobvious_local_variable_types : true
     specify_nonobvious_property_types : true
     strict_top_level_inference : true
     switch_on_type : true
