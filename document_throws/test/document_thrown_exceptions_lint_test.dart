@@ -103,6 +103,36 @@ void main() {
     expect(missing, isEmpty);
   });
 
+  test('accepts doc comment mentions without @Throwing tag', () {
+    final method = findMethod(unit, 'mentionedThrowWithoutTag');
+    final missing = _missing(
+      method.body,
+      method.metadata,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+
+    expect(missing, isEmpty);
+  });
+
+  test('reports doc comment mentions without throws', () {
+    final method = findMethod(unit, 'mentionedNoThrow');
+    final missing = _missing(
+      method.body,
+      method.metadata,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+    final mentioned = docCommentMentionsWithoutThrows(
+      method.body,
+      method.documentationComment,
+      unitsByPath: unitsByPath,
+    );
+
+    expect(missing, isEmpty);
+    expect(mentioned, equals({'BadStateException'}));
+  });
+
   test('ignores throws caught without rethrow', () {
     final method = findMethod(unit, 'throwCaughtWithoutOn');
     final missing = _missing(

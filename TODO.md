@@ -163,7 +163,40 @@ Rename the annotation to @Throwing
 - [x] create a detail set of unit tests for parsing the doc comments for @Throwing
 including dealing with providing good errors via lint output.
 
-- [] If a method/fuction/... doc comment mentions an Exception
+- [] trying to remove orgins with the fix command is still failing:
+
+```
+
+const fieldDelimiterOption = 'field-delimiter';
+const lineDelimiterOption = 'line-delimiter';
+const sortkeyOption = 'sortkey';
+const outputOption = 'output';
+
+/// @Throwing(ArgumentError)
+
+void main(List<String> args) {
+  dsort(args);
+}
+
+/// ArgumentError,
+/// call: 'args|addMultiOption',
+/// origin: 'args|_addOption',
+/// )
+/// @Throwing(ArgumentError)
+```
+
+- [] should there be a new line between the doc command and the method.
+Implement whatever is the dart standard.
+
+```
+/// @Throwing(ArgumentError)
+
+void main(List<String> args) {
+  dsort(args);
+}
+```
+
+- [x] If a method/fuction/... doc comment mentions an Exception
 then don't add a doc comment for that exception as we will assume 
 the exception is already throw. This should also suppress the lint
 but if the exception is mentioned in the doc comments and the exception is

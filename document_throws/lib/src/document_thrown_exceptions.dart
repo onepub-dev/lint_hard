@@ -28,6 +28,11 @@ class DocumentThrownExceptions extends MultiAnalysisRule {
     'Malformed @Throwing doc comment: {0}',
     correctionMessage: 'Use @Throwing(ExceptionType, ...) in doc comments.',
   );
+  static const LintCode docMentionCode = LintCode(
+    'document_thrown_exceptions_unthrown_doc',
+    'Doc comment mentions exception types that are not thrown: {0}.',
+    correctionMessage: 'Remove mentions for exceptions not thrown.',
+  );
 
   // Configure the lint rule metadata.
   DocumentThrownExceptions()
@@ -39,7 +44,11 @@ class DocumentThrownExceptions extends MultiAnalysisRule {
       );
 
   @override
-  List<DiagnosticCode> get diagnosticCodes => [code, malformedDocCode];
+  List<DiagnosticCode> get diagnosticCodes => [
+    code,
+    malformedDocCode,
+    docMentionCode,
+  ];
 
   @override
   // Register visitors that inspect executable members.
@@ -110,6 +119,26 @@ class _Visitor extends SimpleAstVisitor<void> {
   }) {
     // Fast exit when no throw token appears in the body.
     if (body is EmptyFunctionBody) return;
+
+    if (documentationStyle == DocumentationStyle.docComment) {
+      final mentions = _docCommentMentionedTypes(documentationComment);
+      if (mentions.isNotEmpty) {
+        final thrownTypes = collectThrownTypeNames(
+          body,
+          unitsByPath: unitsByPath,
+          externalLookup: externalLookup,
+        );
+        final unthrown = mentions.difference(thrownTypes);
+        if (unthrown.isNotEmpty) {
+          final label = (unthrown.toList()..sort()).join(', ');
+          rule.reportAtToken(
+            reportToken,
+            diagnosticCode: DocumentThrownExceptions.docMentionCode,
+            arguments: [label],
+          );
+        }
+      }
+    }
 
     if (documentationStyle == DocumentationStyle.docComment &&
         documentationComment != null) {
@@ -235,7 +264,7 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
 
   final documented = documentationStyle == DocumentationStyle.annotation
       ? _annotationThrownTypes(metadata)
-      : _docCommentThrownTypes(documentationComment);
+      : _docCommentMentionedTypes(documentationComment);
   final byName = <String, ThrownTypeInfo>{};
   for (final info in thrownResults.infos) {
     final existing = byName[info.name];
@@ -335,6 +364,57 @@ Set<String> _docCommentThrownTypes(Comment? comment) {
     }
   }
   return types;
+}
+
+Set<String> _docCommentMentionedTypes(Comment? comment) {
+  if (comment == null) return const <String>{};
+  final mentioned = <String>{};
+  for (final reference in comment.references) {
+    final name = _commentReferenceName(reference);
+    if (name == null) continue;
+    final normalized = _normalizeTypeName(name);
+    if (normalized != null) {
+      mentioned.add(normalized);
+    }
+  }
+  mentioned.addAll(_docCommentThrownTypes(comment));
+  return mentioned;
+}
+
+String? _commentReferenceName(CommentReference reference) {
+  final expression = reference.expression;
+  if (expression is SimpleIdentifier) {
+    return expression.name;
+  }
+  if (expression is PrefixedIdentifier) {
+    return expression.identifier.name;
+  }
+  if (expression is PropertyAccess) {
+    return expression.propertyName.name;
+  }
+  if (expression is TypeLiteral) {
+    return expression.type.toSource();
+  }
+  if (expression is ConstructorReference) {
+    return expression.constructorName.type.name.lexeme;
+  }
+  return expression.toSource();
+}
+
+Set<String> docCommentMentionsWithoutThrows(
+  FunctionBody body,
+  Comment? comment, {
+  Map<String, CompilationUnit>? unitsByPath,
+  ThrowsCacheLookup? externalLookup,
+}) {
+  final mentions = _docCommentMentionedTypes(comment);
+  if (mentions.isEmpty) return const <String>{};
+  final thrown = collectThrownTypeNames(
+    body,
+    unitsByPath: unitsByPath,
+    externalLookup: externalLookup,
+  );
+  return mentions.difference(thrown);
 }
 
 String? _annotationName(Annotation annotation) {

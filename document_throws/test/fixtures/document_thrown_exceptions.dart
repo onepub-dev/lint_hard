@@ -45,6 +45,14 @@ class Sample {
     throw MissingFileException();
   }
 
+  /// Throws [BadStateException].
+  void mentionedThrowWithoutTag() {
+    throw BadStateException();
+  }
+
+  /// Throws [BadStateException].
+  void mentionedNoThrow() {}
+
   /// @Throwing(BadStateException)
   void annotatedMissingException() {
     throw BadStateException();
