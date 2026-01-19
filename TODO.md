@@ -206,7 +206,7 @@ not throw then warn with a lint.
 chose doccomments over annotations and why we chose Throwing over Throws
 plus any other key decisions that affect the user experience.
 
-- [] ensure that we are indexing transient dependencies and the
+- [x] ensure that we are indexing transient dependencies and the
 correct version of those dependencies. 
 We probably need to be reading the pubspec.lock file in order to do this.
 

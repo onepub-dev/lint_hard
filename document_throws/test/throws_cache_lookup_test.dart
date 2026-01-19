@@ -171,4 +171,38 @@ packages:
       dir.deleteSync(recursive: true);
     }
   });
+
+  test('forProjectRootWithCache reads transitive versions from pubspec.lock', () {
+    final dir = Directory.systemTemp.createTempSync('throws_cache_lookup_');
+    try {
+      final root = p.join(dir.path, 'project');
+      Directory(root).createSync(recursive: true);
+      File(p.join(root, 'pubspec.lock')).writeAsStringSync('''
+packages:
+  direct_pkg:
+    dependency: "direct main"
+    version: "1.0.0"
+    source: hosted
+    description:
+      url: "https://pub.dev"
+  transitive_pkg:
+    dependency: transitive
+    version: "2.1.0"
+    source: hosted
+    description:
+      url: "https://pub.dev"
+''');
+      final cacheRoot = p.join(dir.path, 'pub-cache', 'document_throws', 'cache');
+
+      final lookup = ThrowsCacheLookup.forProjectRootWithCache(
+        root,
+        cacheRoot,
+      );
+      expect(lookup, isNotNull);
+      expect(lookup!.packageVersions['direct_pkg'], equals('1.0.0'));
+      expect(lookup.packageVersions['transitive_pkg'], equals('2.1.0'));
+    } finally {
+      dir.deleteSync(recursive: true);
+    }
+  });
 }
