@@ -91,9 +91,14 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
         : const <String, String>{};
     final lines = <String>[];
     final rawDocLines = <String>[];
-    final maxLineLength = documentationStyle == DocumentationStyle.docComment
-        ? (commentStyle == _DocCommentStyle.block ? 78 : 76)
-        : 80;
+    const lineLimit = 80;
+    final prefixLength = documentationStyle == DocumentationStyle.docComment
+        ? (commentStyle == _DocCommentStyle.block ? 2 : 4)
+        : 0;
+    var maxLineLength = lineLimit - indent.length - prefixLength;
+    if (maxLineLength < 20) {
+      maxLineLength = 20;
+    }
     for (final info in sortedMissing) {
       final rendered = _formatThrownAnnotations(
         info,

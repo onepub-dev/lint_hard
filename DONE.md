@@ -303,3 +303,5 @@ appropriate addFlag/option methods.
 
 - [x] We are still having problems with the lints thing that any type
 in side a comment with [] is an exception.
+
+- [x] We are getting line lengths that are exceeding 80 chars

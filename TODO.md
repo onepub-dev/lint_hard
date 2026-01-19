@@ -1,12 +1,4 @@
 
-- [] We are getting line lengths that are exceeding 80 chars
-
-```
-  /// Path to the directory where users can store their own custom templates
-  /// @Throwing(ArgumentError, call: 'path|join', origin: 'path|_validateArgList')
-  String get pathToTemplateProjectCustom =>
-      p.join(pathToDCli, templateDir, 'project', 'custom');
-```      
 - [] on the main methods of every test I'm getting what appears to be an incorrect
 warning - or incorrect throws staments.
 

@@ -121,6 +121,34 @@ void main() {
     expect(updated, contains('/// )\n'));
   });
 
+  test('fix --origin wraps indented throws annotation lines', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_provenance_indented.dart';
+    final resolved = await resolveFixture(File(fixturePath).absolute.path);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      externalLookup: LongProvenanceLookup(),
+      includeSource: true,
+    );
+    expect(editsByFile, isNotEmpty);
+    final edits = editsByFile[resolved.unit.path] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    edits.sort((a, b) => b.offset.compareTo(a.offset));
+
+    final updated = SourceEdit.applySequence(
+      resolved.unit.content,
+      edits,
+    );
+
+    expect(updated, contains('  /// @Throwing(\n'));
+    expect(
+      updated,
+      isNot(contains("  /// @Throwing(FormatException, call:")),
+    );
+  });
+
   test('fix without --origin strips provenance from annotations', () async {
     final fixturePath =
         'test/fixtures/document_thrown_exceptions_provenance_existing.dart';
