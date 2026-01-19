@@ -36,11 +36,12 @@ Future<void> main(List<String> args) async {
       ? DocumentationStyle.annotation
       : (forceDocComment ? DocumentationStyle.docComment : null);
   final patterns = args.where((arg) => !arg.startsWith('-')).toList();
+  final summaryNotes = <String>[];
   if (includeSource) {
-    stdout.writeln(
+    summaryNotes.add(
       'Including provenance in @Throwing annotations (--origin).',
     );
-    stdout.writeln(
+    summaryNotes.add(
       'To remove provenance, rerun document_throws_fix without --origin after '
       'removing existing @Throwing entries.',
     );
@@ -112,6 +113,9 @@ Future<void> main(List<String> args) async {
   }
 
   stdout.writeln('Updated $updatedCount file(s).');
+  for (final note in summaryNotes) {
+    stdout.writeln(note);
+  }
 }
 
 Future<List<String>> _collectDartFiles(
