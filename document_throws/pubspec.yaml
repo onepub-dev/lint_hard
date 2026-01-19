@@ -16,5 +16,5 @@ dependencies:
 dev_dependencies:
   test: ^1.25.0
 executables:
-  document_throws_fix: dt-fix
-  document_throws_index: dt-index
+  dt-fix: document_throws_fix
+  dt-index: document_throws_index
