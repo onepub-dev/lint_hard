@@ -234,15 +234,15 @@ Skipping Flutter package flutter_web_plugins unknown (index exists).
 Indexing Flutter package flutter_driver unknown (9/9)
 Skipping Flutter package flutter_driver unknown (index exists).
 
-- [] the indexer appears to output two messages when skipping an index
+- [x] the indexer appears to output two messages when skipping an index
 Indexing Flutter package flutter_driver unknown (9/9)
 Skipping Flutter package flutter_driver unknown (index exists).
 
 Instead it should only output the skipping message.
 
-- [] the indexer should provide a summary - n packages indexed, m packages skipped. 
+- [x] the indexer should provide a summary - n packages indexed, m packages skipped. 
 
-- [] in case the user switches between doc comments and annotations
+- [x] in case the user switches between doc comments and annotations
 then we should remove the other type, where it is safe to do so.
 
 

@@ -42,6 +42,8 @@ Future<void> main(List<String> args) async {
     if (lockFile.existsSync()) {
       final packages = _readPackageLock(lockFile);
       log('Found ${packages.length} package(s) to index.');
+      var indexedPackages = 0;
+      var skippedPackages = 0;
       var indexed = 0;
       for (final package in packages) {
         final packageRoot = _packageRoot(package);
@@ -50,10 +52,6 @@ Future<void> main(List<String> args) async {
           continue;
         }
         indexed++;
-        log(
-          'Indexing ${package.name} ${package.version} '
-          '($indexed/${packages.length})',
-        );
         final outFile = File(
           p.join(
             outputRoot,
@@ -66,9 +64,18 @@ Future<void> main(List<String> args) async {
           ),
         );
         if (!recreate && outFile.existsSync()) {
-          log('Skipping ${package.name} ${package.version} (index exists).');
+          skippedPackages++;
+          log(
+            'Skipping ${package.name} ${package.version} '
+            '($indexed/${packages.length}) (index exists).',
+          );
           continue;
         }
+        indexedPackages++;
+        log(
+          'Indexing ${package.name} ${package.version} '
+          '($indexed/${packages.length})',
+        );
         final entries = await _indexPackage(
           packageRoot,
           sdkPath,
@@ -80,6 +87,10 @@ Future<void> main(List<String> args) async {
           'Wrote ${entries.length} entries to ${outFile.path}',
         );
       }
+      log(
+        'Package index summary: $indexedPackages indexed, '
+        '$skippedPackages skipped.',
+      );
     } else {
       log('pubspec.lock not found; skipping packages.');
     }
@@ -92,13 +103,13 @@ Future<void> main(List<String> args) async {
       log('Unable to determine SDK path; skipping SDK index.');
       return;
     }
-    log('Indexing SDK $sdkVersion');
     final outFile = File(
       p.join(outputRoot, 'throws', 'v1', 'sdk', '$sdkVersion.throws'),
     );
     if (!recreate && outFile.existsSync()) {
       log('Skipping SDK $sdkVersion (index exists).');
     } else {
+      log('Indexing SDK $sdkVersion');
       final sdkEntries = await _indexSdk(sdkRoot, sdkPath, log: log);
       ThrowsCacheWriter.writeFileSync(outFile, sdkEntries);
       log(
@@ -128,13 +139,11 @@ Future<void> main(List<String> args) async {
             '${p.join(flutterRootPath, 'packages')}',
           );
         } else {
+          var indexedPackages = 0;
+          var skippedPackages = 0;
           var indexed = 0;
           for (final package in packages) {
             indexed++;
-            log(
-              'Indexing Flutter package ${package.name} ${package.version} '
-              '($indexed/${packages.length})',
-            );
             final outFile = File(
               p.join(
                 outputRoot,
@@ -147,12 +156,18 @@ Future<void> main(List<String> args) async {
               ),
             );
             if (!recreate && outFile.existsSync()) {
+              skippedPackages++;
               log(
                 'Skipping Flutter package ${package.name} ${package.version} '
-                '(index exists).',
+                '($indexed/${packages.length}) (index exists).',
               );
               continue;
             }
+            indexedPackages++;
+            log(
+              'Indexing Flutter package ${package.name} ${package.version} '
+              '($indexed/${packages.length})',
+            );
             final entries = await _indexPackage(
               package.path,
               sdkPath,
@@ -164,6 +179,10 @@ Future<void> main(List<String> args) async {
               'Wrote ${entries.length} entries to ${outFile.path}',
             );
           }
+          log(
+            'Flutter package summary: $indexedPackages indexed, '
+            '$skippedPackages skipped.',
+          );
         }
       }
     }

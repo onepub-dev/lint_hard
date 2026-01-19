@@ -36,6 +36,13 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
           (target) => target.declarationOffset == onlyTarget.declarationOffset,
         );
   for (final target in targets) {
+    final hasThrowingAnnotations = _hasThrowingAnnotations(target.metadata);
+    final hasDocThrowingTags = _hasDocThrowingTags(
+      target.documentationComment,
+    );
+    final removeOtherStyle = documentationStyle == DocumentationStyle.docComment
+        ? hasThrowingAnnotations
+        : hasDocThrowingTags;
     final needsProvenanceCleanup =
         !includeSource &&
         (documentationStyle == DocumentationStyle.annotation
@@ -57,7 +64,7 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
             unitsByPath: unitsByPath,
             externalLookup: externalLookup,
           );
-    if (thrownInfos.isEmpty) continue;
+    if (thrownInfos.isEmpty && !removeOtherStyle) continue;
 
     final commentStyle = documentationStyle == DocumentationStyle.docComment
         ? _docCommentStyle(target.documentationComment)
@@ -120,17 +127,36 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
       );
     } else {
       if (includeSource || needsProvenanceCleanup) {
-        final removeEdits = documentationStyle == DocumentationStyle.annotation
-            ? _removeThrowsAnnotations(
-                content,
-                target.metadata,
-                sortedMissing.map((info) => info.name).toSet(),
-              )
-            : _removeDocThrowingTags(
-                content,
-                target.documentationComment,
-              );
-        _addEdits(editsByPath, unitResult.path, removeEdits);
+        if (documentationStyle == DocumentationStyle.annotation) {
+          final removeEdits = _removeThrowsAnnotations(
+            content,
+            target.metadata,
+            sortedMissing.map((info) => info.name).toSet(),
+          );
+          _addEdits(editsByPath, unitResult.path, removeEdits);
+        } else {
+          final removeEdits = _removeDocThrowingTags(
+            content,
+            target.documentationComment,
+          );
+          _addEdits(editsByPath, unitResult.path, removeEdits);
+        }
+      }
+      if (removeOtherStyle) {
+        if (documentationStyle == DocumentationStyle.annotation) {
+          final removeEdits = _removeDocThrowingTags(
+            content,
+            target.documentationComment,
+          );
+          _addEdits(editsByPath, unitResult.path, removeEdits);
+        } else {
+          final removeEdits = _removeThrowsAnnotations(
+            content,
+            target.metadata,
+            _annotationThrownTypes(target.metadata),
+          );
+          _addEdits(editsByPath, unitResult.path, removeEdits);
+        }
       }
       final insertionText = _renderInsertionText(
         indent,
@@ -307,6 +333,14 @@ bool _hasProvenanceAnnotations(NodeList<Annotation>? metadata) {
   return false;
 }
 
+bool _hasThrowingAnnotations(NodeList<Annotation>? metadata) {
+  return _annotationThrownTypes(metadata).isNotEmpty;
+}
+
+bool _hasDocThrowingTags(Comment? comment) {
+  return _parseDocThrowingTags(comment).isNotEmpty;
+}
+
 bool _annotationHasProvenance(Annotation annotation) {
   final arguments = annotation.arguments?.arguments;
   if (arguments == null) return false;
@@ -462,6 +496,23 @@ String? _annotationName(Annotation annotation) {
   if (name is SimpleIdentifier) return name.name;
   if (name is PrefixedIdentifier) return name.identifier.name;
   return null;
+}
+
+Set<String> _annotationThrownTypes(NodeList<Annotation>? metadata) {
+  if (metadata == null || metadata.isEmpty) return const <String>{};
+  final types = <String>{};
+  for (final annotation in metadata) {
+    if (_annotationName(annotation) != throwingAnnotationName) continue;
+    final args = annotation.arguments?.arguments;
+    if (args == null || args.isEmpty) continue;
+    final first = args.first;
+    if (first is ListLiteral) continue;
+    final normalized = _normalizeTypeName(first.toSource());
+    if (normalized != null) {
+      types.add(normalized);
+    }
+  }
+  return types;
 }
 
 String? _annotationTypeName(Annotation annotation) {

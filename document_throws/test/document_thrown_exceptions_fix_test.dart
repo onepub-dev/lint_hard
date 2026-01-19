@@ -411,4 +411,46 @@ void main() {
       ),
     );
   });
+
+  test('fix removes annotations when using doc comments', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_switch_style.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      documentationStyle: DocumentationStyle.docComment,
+    );
+    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, edits);
+
+    expect(updated, isNot(contains('\n@Throwing(BadStateException)')));
+    expect(updated, contains('/// @Throwing(BadStateException)'));
+    expect(updated, contains('/// @Throwing(MissingFileException)'));
+  });
+
+  test('fix removes doc comment tags when using annotations', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_switch_style.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      documentationStyle: DocumentationStyle.annotation,
+    );
+    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, edits);
+
+    expect(updated, isNot(contains('/// @Throwing(')));
+    expect(updated, contains('@Throwing(BadStateException)'));
+    expect(updated, contains('@Throwing(MissingFileException)'));
+  });
 }
