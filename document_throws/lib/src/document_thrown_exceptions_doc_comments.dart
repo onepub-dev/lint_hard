@@ -34,54 +34,22 @@ class DocCommentAnalyzer {
   }
 
   bool _referenceHasThrowCue(Comment comment, CommentReference reference) {
-    final text = _docCommentText(comment);
-    if (!_containsThrowWord(text)) return false;
     final raw = reference.toSource();
     final bracketed = '[$raw]';
-    return text.contains(raw) || text.contains(bracketed);
+    for (final line in _commentLines(comment)) {
+      if (!(line.contains(raw) || line.contains(bracketed))) continue;
+      if (_containsThrowWord(line)) return true;
+    }
+    return false;
   }
 
-  String _docCommentText(Comment comment) {
+  List<String> _commentLines(Comment comment) {
     final source = comment.tokens.map((token) => token.lexeme).join('\n');
-    final trimmedLeft = source.trimLeft();
-    if (trimmedLeft.startsWith('///')) {
-      final lines = source.split('\n');
-      return lines.map(_stripDocLinePrefix).join('\n').trim();
-    }
-    if (trimmedLeft.startsWith('/**')) {
-      var trimmed = source;
-      trimmed = _stripLeadingBlockPrefix(trimmed);
-      trimmed = _stripTrailingBlockSuffix(trimmed);
-      final lines = trimmed.split('\n');
-      return lines.map(_stripBlockDocLine).join('\n').trim();
-    }
-    return source.trim();
-  }
-
-  String _stripDocLinePrefix(String line) {
-    final index = line.indexOf('///');
-    if (index == -1) return line.trim();
-    return line.substring(index + 3).trimLeft();
-  }
-
-  String _stripBlockDocLine(String line) {
-    final trimmed = line.trimLeft();
-    if (trimmed.startsWith('*')) {
-      return trimmed.substring(1).trimLeft();
-    }
-    return trimmed.trimRight();
-  }
-
-  String _stripLeadingBlockPrefix(String text) {
-    final index = text.indexOf('/**');
-    if (index == -1) return text;
-    return text.substring(index + 3);
-  }
-
-  String _stripTrailingBlockSuffix(String text) {
-    final index = text.lastIndexOf('*/');
-    if (index == -1) return text;
-    return text.substring(0, index);
+    final lines = source.split('\n');
+    return [
+      for (final line in lines)
+        line.endsWith('\r') ? line.substring(0, line.length - 1) : line,
+    ];
   }
 
   bool _containsThrowWord(String sentence) {

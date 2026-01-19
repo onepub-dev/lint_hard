@@ -57,6 +57,12 @@ class Sample {
   /// relative to the current directory.
   void mentionedNonThrow(String path) {}
 
+  /// Designed to work with [backupFile] and [withFileProtectionAsync].
+  /// If the backup is missing, this function throws a [MissingFileException].
+  void mentionedThrowSentence() {
+    throw MissingFileException();
+  }
+
   /// @Throwing(BadStateException)
   void annotatedMissingException() {
     throw BadStateException();

@@ -151,6 +151,24 @@ void main() {
     expect(mentioned, isEmpty);
   });
 
+  test('ignores references outside the throw sentence', () {
+    final method = findMethod(unit, 'mentionedThrowSentence');
+    final missing = _missing(
+      method.body,
+      method.metadata,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+    final mentioned = docCommentMentionsWithoutThrows(
+      method.body,
+      method.documentationComment,
+      unitsByPath: unitsByPath,
+    );
+
+    expect(missing, isEmpty);
+    expect(mentioned, isEmpty);
+  });
+
   test('ignores throws caught without rethrow', () {
     final method = findMethod(unit, 'throwCaughtWithoutOn');
     final missing = _missing(
