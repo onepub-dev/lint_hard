@@ -202,7 +202,7 @@ the exception is already throw. This should also suppress the lint
 but if the exception is mentioned in the doc comments and the exception is
 not throw then warn with a lint.
 
-- [] Create a section need the end of the readme that discussion why we
+- [x] Create a section need the end of the readme that discussion why we
 chose doccomments over annotations and why we chose Throwing over Throws
 plus any other key decisions that affect the user experience.
 

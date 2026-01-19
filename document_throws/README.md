@@ -83,3 +83,13 @@ dart pub global activate document_throws
 dt-index
 dt-fix lib/**/*.dart
 ```
+
+## Design choices
+
+Doc comments are the default because they show up in editor hovers and API
+documentation without additional tooling. Annotations remain available for teams
+that prefer structured metadata in code and are already depending on an
+annotation package.
+
+The annotation is named `@Throwing` to avoid clashes with `Throws` in the test
+package while still describing its intent.
