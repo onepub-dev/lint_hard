@@ -13,8 +13,8 @@ import 'throws_cache_lookup.dart';
 
 class ThrowingUnthrownException extends AnalysisRule {
   static const LintCode code = LintCode(
-    'throwing_unthrown_exception',
-    'Unthrown @Throwing exception type: {0}.',
+    'documented_unthrown_exception',
+    'Documented @Throwing exception type: {0}.',
     correctionMessage: 'Remove @Throwing types that are not thrown.',
   );
 
