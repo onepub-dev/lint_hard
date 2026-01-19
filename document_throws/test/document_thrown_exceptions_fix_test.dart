@@ -611,4 +611,26 @@ void main() {
     expect(updated, contains('///\n/// The backup is placed'));
     expect(updated, isNot(contains('/// \n/// The backup is placed')));
   });
+
+  test('fix preserves doc comment spacing for list items', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_space_preservation.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      includeSource: false,
+      documentationStyle: DocumentationStyle.docComment,
+    );
+    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, edits);
+
+    expect(updated, contains('///  * [restoreFile]'));
+    expect(updated, contains('///  * [withFileProtectionAsync]'));
+    expect(updated, isNot(contains('/// * [restoreFile]')));
+  });
 }

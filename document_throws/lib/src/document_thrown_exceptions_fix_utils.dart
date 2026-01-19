@@ -941,7 +941,14 @@ String _buildDocComment(
     return '$indent/**\n$body\n$indent */';
   }
   final body = trimmed
-      .map((line) => line.isEmpty ? '$indent///' : '$indent/// $line')
+      .map(
+        (line) =>
+            line.isEmpty
+                ? '$indent///'
+                : line.startsWith(' ')
+                ? '$indent///$line'
+                : '$indent/// $line',
+      )
       .join('\n');
   return '$body\n';
 }
@@ -949,7 +956,7 @@ String _buildDocComment(
 String _stripDocLinePrefix(String line, String prefix) {
   final index = line.indexOf(prefix);
   if (index == -1) return line.trim();
-  return line.substring(index + prefix.length).trimLeft();
+  return line.substring(index + prefix.length);
 }
 
 String _stripBlockDocLine(String line) {
