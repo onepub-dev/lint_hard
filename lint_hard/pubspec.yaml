@@ -1,5 +1,5 @@
 name: lint_hard
-version: 7.0.1
+version: 7.1.0
 homepage: https://github.com/noojee/lint_hard.git
 description: All the lints except where they clash.
 repository: https://github.com/noojee/lint_hard.git
