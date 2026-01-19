@@ -55,7 +55,7 @@ class _Visitor extends SimpleAstVisitor<void> {
     final missing = lookup.missingCaches();
     if (missing.isEmpty) return;
 
-    final firstMissing = _firstMissingLabel(missing);
+    final firstMissing = firstMissingCacheLabel(missing);
     if (firstMissing == null) return;
 
     final token = node.beginToken;
@@ -63,7 +63,7 @@ class _Visitor extends SimpleAstVisitor<void> {
   }
 }
 
-String? _firstMissingLabel(MissingThrowsCaches missing) {
+String? firstMissingCacheLabel(MissingThrowsCaches missing) {
   if (missing.sdkMissing) return 'sdk';
   if (missing.missingPackages.isEmpty) return null;
   return missing.missingPackages.first;
