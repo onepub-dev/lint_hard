@@ -1,5 +1,3 @@
-import 'package:lint_hard/lint_hard.dart';
-
 class BadStateException implements Exception {}
 
 class Thrower {

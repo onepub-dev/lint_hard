@@ -51,6 +51,14 @@ You can see the full set of lints in the analysis_options.yaml file.
       lint_hard:
     ```
 
+   To disable custom lint_hard plugin lints while keeping the lint set,
+   override the plugin list:
+
+   ```yaml
+   analyzer:
+     plugins: []
+   ```
+
 5. Remove any existing lint packages (lints, pedantic, flutter_lints) from
 your `pubspec.yaml` and `analysis_options.yaml`.
 6. Run `dart pub get`
@@ -107,7 +115,7 @@ void parseInput(String value) {
 Annotation example:
 
 ```dart
-import 'package:lint_hard/throws.dart';
+import 'package:document_throws_annotation/document_throws_annotation.dart';
 
 @Throwing(FormatException, reason: 'Bad format')
 void parseWithReason(String value) {

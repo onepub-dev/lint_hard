@@ -5,7 +5,5 @@ description: An example project that uses lint_hard.
 environment: 
   sdk: '>=3.7.0 <4.0.0'
 dev_dependencies: 
-  document_throws: ^0.1.0
   lint_hard: 
     path: ..
-  document_throws_annotation: ^0.1.0
