@@ -14,6 +14,7 @@ import 'throws_cache.dart';
 import 'throws_cache_lookup.dart';
 import 'throwing_annotation.dart';
 import 'throwing_doc_parser.dart';
+import 'unit_provider.dart';
 
 class DocumentThrownExceptions extends MultiAnalysisRule {
   static const LintCode code = LintCode(
@@ -179,16 +180,19 @@ class _Visitor extends SimpleAstVisitor<void> {
 _ThrownTypeResults _collectThrownTypes(
   FunctionBody body, {
   Map<String, CompilationUnit>? unitsByPath,
+  UnitProvider? unitProvider,
   _ThrownTypeResolver? resolver,
   ThrowsCacheLookup? externalLookup,
   bool includeLineNumbersForAll = false,
 }) {
+  final effectiveUnitProvider = unitProvider ??
+      (unitsByPath == null ? null : MapUnitProvider(unitsByPath));
   final effectiveResolver =
       resolver ??
-      (unitsByPath == null
+      (effectiveUnitProvider == null
           ? null
           : _ThrownTypeResolver(
-              unitsByPath,
+              effectiveUnitProvider,
               externalLookup: externalLookup,
               includeLineNumbersForAll: includeLineNumbersForAll,
             ));
@@ -196,7 +200,7 @@ _ThrownTypeResults _collectThrownTypes(
   body.accept(collector);
   return _ThrownTypeResults(
     collector.thrownTypes,
-    collector._thrown,
+    collector._thrownByName.values.toList(),
     sawThrowExpression: collector.sawThrowExpression,
     sawUnknownThrowExpression: collector.sawUnknownThrowExpression,
   );
@@ -224,6 +228,7 @@ Set<String> missingThrownTypeDocs(
   DocumentationStyle documentationStyle = DocumentationStyle.docComment,
   bool allowSourceFallback = false,
   Map<String, CompilationUnit>? unitsByPath,
+  UnitProvider? unitProvider,
   ThrowsCacheLookup? externalLookup,
   _ThrownTypeResults? thrownResults,
 }) {
@@ -234,6 +239,7 @@ Set<String> missingThrownTypeDocs(
     documentationStyle: documentationStyle,
     allowSourceFallback: allowSourceFallback,
     unitsByPath: unitsByPath,
+    unitProvider: unitProvider,
     externalLookup: externalLookup,
     thrownResults: thrownResults,
   );
@@ -247,6 +253,7 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
   DocumentationStyle documentationStyle = DocumentationStyle.docComment,
   bool allowSourceFallback = false,
   Map<String, CompilationUnit>? unitsByPath,
+  UnitProvider? unitProvider,
   ThrowsCacheLookup? externalLookup,
   bool includeLineNumbersForAll = false,
   _ThrownTypeResults? thrownResults,
@@ -257,6 +264,7 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
       _collectThrownTypes(
         body,
         unitsByPath: unitsByPath,
+        unitProvider: unitProvider,
         externalLookup: externalLookup,
         includeLineNumbersForAll: includeLineNumbersForAll,
       );
@@ -306,11 +314,13 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
 Set<String> collectThrownTypeNames(
   FunctionBody body, {
   Map<String, CompilationUnit>? unitsByPath,
+  UnitProvider? unitProvider,
   ThrowsCacheLookup? externalLookup,
 }) {
   return _collectThrownTypes(
     body,
     unitsByPath: unitsByPath,
+    unitProvider: unitProvider,
     externalLookup: externalLookup,
   ).types;
 }
@@ -318,12 +328,14 @@ Set<String> collectThrownTypeNames(
 List<ThrownTypeInfo> collectThrownTypeInfos(
   FunctionBody body, {
   Map<String, CompilationUnit>? unitsByPath,
+  UnitProvider? unitProvider,
   ThrowsCacheLookup? externalLookup,
   bool includeLineNumbersForAll = false,
 }) {
   return _collectThrownTypes(
     body,
     unitsByPath: unitsByPath,
+    unitProvider: unitProvider,
     externalLookup: externalLookup,
     includeLineNumbersForAll: includeLineNumbersForAll,
   ).infos;
@@ -449,7 +461,8 @@ class ThrownTypeInfo {
 
 class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
   final _ThrownTypeResolver? _resolver;
-  final List<ThrownTypeInfo> _thrown = [];
+  final Map<String, ThrownTypeInfo> _thrownByName = {};
+  final Map<String, Set<String>> _provenanceKeysByName = {};
   final Set<String> thrownTypes = <String>{};
   bool sawThrowExpression = false;
   int _unknownThrowCount = 0;
@@ -501,7 +514,7 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
     final bodyCollector = _ThrowTypeCollector(_resolver);
     node.body.accept(bodyCollector);
 
-    for (final info in bodyCollector._thrown) {
+    for (final info in bodyCollector._thrownByName.values) {
       if (!_isCaughtWithoutRethrow(info, node.catchClauses)) {
         if (!_catchListHandlesName(node.catchClauses, info.name)) {
           _recordThrow(info);
@@ -524,8 +537,43 @@ class _ThrowTypeCollector extends RecursiveAstVisitor<void> {
   }
 
   void _recordThrow(ThrownTypeInfo info) {
-    _thrown.add(info);
     thrownTypes.add(info.name);
+    final existing = _thrownByName[info.name];
+    if (existing == null) {
+      final provenance = _dedupeProvenance(info.name, info.provenance);
+      _thrownByName[info.name] = ThrownTypeInfo(
+        info.name,
+        info.type,
+        provenance: provenance,
+      );
+      return;
+    }
+    final mergedType = existing.type ?? info.type;
+    final mergedProvenance = <ThrowsProvenance>[
+      ...existing.provenance,
+      ..._dedupeProvenance(info.name, info.provenance),
+    ];
+    _thrownByName[info.name] = ThrownTypeInfo(
+      info.name,
+      mergedType,
+      provenance: mergedProvenance,
+    );
+  }
+
+  List<ThrowsProvenance> _dedupeProvenance(
+    String name,
+    List<ThrowsProvenance> provenance,
+  ) {
+    if (provenance.isEmpty) return const <ThrowsProvenance>[];
+    final seen = _provenanceKeysByName.putIfAbsent(name, () => <String>{});
+    final deduped = <ThrowsProvenance>[];
+    for (final entry in provenance) {
+      final key = '${entry.call}|${entry.origin ?? ''}';
+      if (seen.add(key)) {
+        deduped.add(entry);
+      }
+    }
+    return deduped;
   }
 
   void _addInvokedThrows(ExecutableElement? element) {
@@ -715,7 +763,7 @@ String? _catchTypeName(TypeAnnotation exceptionType) {
 }
 
 class _ThrownTypeResolver {
-  final Map<String, CompilationUnit> _unitsByPath;
+  final UnitProvider _unitProvider;
   final ThrowsCacheLookup? _externalLookup;
   final bool _includeLineNumbersForAll;
   final Map<ExecutableElement, List<ThrownTypeInfo>> _cache = {};
@@ -723,7 +771,7 @@ class _ThrownTypeResolver {
   final Map<String, LineInfo> _lineInfoCache = {};
 
   _ThrownTypeResolver(
-    this._unitsByPath, {
+    this._unitProvider, {
     ThrowsCacheLookup? externalLookup,
     bool includeLineNumbersForAll = false,
   }) : _externalLookup = externalLookup,
@@ -773,7 +821,7 @@ class _ThrownTypeResolver {
   CompilationUnit? _unitForFragment(Fragment fragment) {
     final source = fragment.libraryFragment?.source;
     if (source == null) return null;
-    return _unitsByPath[source.fullName];
+    return _unitProvider.unitForPath(source.fullName);
   }
 
   String keyForExecutable(ExecutableElement element) {

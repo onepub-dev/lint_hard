@@ -4,8 +4,8 @@ import 'package:analysis_server_plugin/edit/dart/correction_producer.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/diagnostic/diagnostic.dart';
-import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
+import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
 import 'package:document_throws/src/document_thrown_exceptions.dart';
 import 'package:document_throws/src/document_thrown_exceptions_fix.dart';
 import 'package:document_throws/src/document_thrown_exceptions_fix_utils.dart';
@@ -18,10 +18,11 @@ List<SourceEdit> _collectFileEdits(
   List<SourceFileEdit> edits,
   String filePath,
 ) {
-  final fileEdits = edits
-      .where((edit) => edit.file == filePath)
-      .expand((edit) => edit.edits)
-      .toList();
+  final fileEdits =
+      edits
+          .where((edit) => edit.file == filePath)
+          .expand((edit) => edit.edits)
+          .toList();
   expect(fileEdits, isNotEmpty);
   fileEdits.sort((a, b) => a.offset.compareTo(b.offset));
   return fileEdits;
@@ -83,7 +84,10 @@ void main() {
     final builder = ChangeBuilder(session: resolvedUnit.session);
     await fix.compute(builder);
 
-    final edits = _collectFileEdits(builder.sourceChange.edits, fixtureFilePath);
+    final edits = _collectFileEdits(
+      builder.sourceChange.edits,
+      fixtureFilePath,
+    );
     final content = await File(fixtureFilePath).readAsString();
     return _applyEdits(content, edits);
   }
@@ -153,7 +157,8 @@ void main() {
   });
 
   test('fix uses doc comments without adding import by default', () async {
-    final fixturePath = 'test/fixtures/document_thrown_exceptions_no_import.dart';
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_no_import.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
     final resolved = await resolveFixture(fixtureFilePath);
     final fn = findFunction(resolved.unit.unit, 'undocumentedTopLevel');
@@ -196,7 +201,8 @@ void main() {
   });
 
   test('fix inserts annotation import in annotation mode', () async {
-    final fixturePath = 'test/fixtures/document_thrown_exceptions_no_import.dart';
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_no_import.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
     final resolved = await resolveFixture(fixtureFilePath);
 
@@ -290,7 +296,6 @@ void main() {
         'test/fixtures/document_thrown_exceptions_with_imports.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
     final resolved = await resolveFixture(fixtureFilePath);
-    final fn = findFunction(resolved.unit.unit, 'undocumentedTopLevel');
 
     final editsByFile = documentThrownExceptionEdits(
       resolved.unit,
@@ -322,8 +327,7 @@ void main() {
   });
 
   test('fix preserves shebang and constant lines', () async {
-    final fixturePath =
-        'test/fixtures/document_thrown_exceptions_shebang.dart';
+    final fixturePath = 'test/fixtures/document_thrown_exceptions_shebang.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
     final resolved = await resolveFixture(fixtureFilePath);
     final fn = findFunction(resolved.unit.unit, 'dsort');
@@ -399,8 +403,10 @@ void main() {
     final edits = builder.sourceChange.edits;
     expect(edits, isNotEmpty);
     final fileEdit = edits.firstWhere((edit) => edit.file == fixtureFilePath);
-    final updated =
-        SourceEdit.applySequence(resolved.unit.content, fileEdit.edits);
+    final updated = SourceEdit.applySequence(
+      resolved.unit.content,
+      fileEdit.edits,
+    );
 
     expect(
       updated,

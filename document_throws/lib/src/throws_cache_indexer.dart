@@ -3,16 +3,23 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/source/line_info.dart';
 
 import 'document_thrown_exceptions.dart';
 import 'throws_cache.dart';
+import 'unit_provider.dart';
 
 Map<String, ThrowsCacheEntry> buildThrowsIndex(
   ResolvedLibraryResult library, {
   String? libraryUri,
   Map<String, CompilationUnit>? unitsByPath,
+  UnitProvider? unitProvider,
 }) {
-  final resolvedUnits = unitsByPath ?? _unitsByPath(library.units);
+  final resolvedUnits =
+      unitProvider ??
+      (unitsByPath == null
+          ? MapUnitProvider(_unitsByPath(library.units))
+          : MapUnitProvider(unitsByPath));
   final entries = <String, ThrowsCacheEntry>{};
   final visitor = _ExecutableIndexCollector(
     libraryUri ?? library.element.firstFragment.source.uri.toString(),
@@ -29,10 +36,10 @@ Map<String, ThrowsCacheEntry> buildThrowsIndex(
 
 class _ExecutableIndexCollector extends RecursiveAstVisitor<void> {
   final String libraryUri;
-  final Map<String, CompilationUnit> unitsByPath;
+  final UnitProvider unitProvider;
   final Map<String, ThrowsCacheEntry> entries;
 
-  _ExecutableIndexCollector(this.libraryUri, this.unitsByPath, this.entries);
+  _ExecutableIndexCollector(this.libraryUri, this.unitProvider, this.entries);
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
@@ -69,7 +76,7 @@ class _ExecutableIndexCollector extends RecursiveAstVisitor<void> {
   void _record(ExecutableElement element, FunctionBody body) {
     final infos = collectThrownTypeInfos(
       body,
-      unitsByPath: unitsByPath,
+      unitProvider: unitProvider,
       includeLineNumbersForAll: true,
     );
     if (infos.isEmpty) return;
@@ -80,7 +87,7 @@ class _ExecutableIndexCollector extends RecursiveAstVisitor<void> {
   void _recordConstructor(ConstructorElement element, FunctionBody body) {
     final infos = collectThrownTypeInfos(
       body,
-      unitsByPath: unitsByPath,
+      unitProvider: unitProvider,
       includeLineNumbersForAll: true,
     );
     if (infos.isEmpty) return;
@@ -159,10 +166,13 @@ class _ExecutableIndexCollector extends RecursiveAstVisitor<void> {
 
   int? _lineNumberForElement(ExecutableElement element) {
     final source = element.library.firstFragment.source;
-    final unit = unitsByPath[source.fullName];
-    if (unit == null) return null;
+    final unit = unitProvider.unitForPath(source.fullName);
     final offset = element.firstFragment.offset;
-    return unit.lineInfo.getLocation(offset).lineNumber;
+    if (unit != null) {
+      return unit.lineInfo.getLocation(offset).lineNumber;
+    }
+    final lineInfo = LineInfo.fromContent(source.contents.data);
+    return lineInfo.getLocation(offset).lineNumber;
   }
 }
 

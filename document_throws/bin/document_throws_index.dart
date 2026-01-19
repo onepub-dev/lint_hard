@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:document_throws/src/throws_cache.dart';
@@ -242,9 +243,9 @@ Future<Map<String, ThrowsCacheEntry>> _indexLibraries(
   final session = context.currentSession;
   final entries = <String, ThrowsCacheEntry>{};
   final seenLibraries = <String>{};
-  final resolvedLibraries = <ResolvedLibraryResult>[];
   log?.call('  Resolving libraries...');
 
+  final resolvedLibraries = <ResolvedLibraryResult>[];
   for (final file in files) {
     final resolved = await session.getResolvedLibraryContaining(file);
     if (resolved is! ResolvedLibraryResult) continue;

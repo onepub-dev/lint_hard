@@ -74,6 +74,46 @@ packages:
     }
   });
 
+  test('missingCaches handles path package sources', () {
+    final dir = Directory.systemTemp.createTempSync('throws_cache_lookup_');
+    try {
+      final root = p.join(dir.path, 'project');
+      Directory(root).createSync(recursive: true);
+      File(p.join(root, 'pubspec.lock')).writeAsStringSync('''
+packages:
+  local_pkg:
+    version: "1.0.0"
+    source: path
+    description:
+      path: deps/local_pkg
+''');
+      final cacheRoot = p.join(dir.path, 'pub-cache', 'document_throws', 'cache');
+      final cacheFile = File(p.join(
+        cacheRoot,
+        'throws',
+        'v1',
+        'package',
+        'local_pkg',
+        'path-deps_local_pkg',
+        '1.0.0.throws',
+      ));
+      ThrowsCacheWriter.writeFileSync(cacheFile, {
+        'key': ThrowsCacheEntry(thrown: ['BadStateException']),
+      });
+
+      final lookup = ThrowsCacheLookup.forProjectRootWithCache(
+        root,
+        cacheRoot,
+      );
+      expect(lookup, isNotNull);
+
+      final missing = lookup!.missingCaches();
+      expect(missing.missingPackages, isEmpty);
+    } finally {
+      dir.deleteSync(recursive: true);
+    }
+  });
+
   test('missingCaches reports missing sdk cache', () {
     final dir = Directory.systemTemp.createTempSync('throws_cache_lookup_');
     try {

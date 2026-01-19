@@ -279,7 +279,14 @@ Map<String, String> _readPackageSources(File lockFile) {
       final url = description is YamlMap ? description['url']?.toString() : null;
       sourceId = 'hosted-${_hostForUrl(url)}';
     } else if (source == 'path') {
-      final pathValue = description?.toString() ?? '';
+      String pathValue = '';
+      if (description is YamlMap) {
+        pathValue = description['path']?.toString() ?? '';
+      } else if (description is String) {
+        pathValue = description;
+      } else {
+        pathValue = description?.toString() ?? '';
+      }
       sourceId = 'path-${_sanitizeId(pathValue)}';
     } else if (source == 'git') {
       if (description is YamlMap) {

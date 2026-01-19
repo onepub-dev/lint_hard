@@ -293,4 +293,5 @@ Doctor summary (to see all details, run flutter doctor -v):
 - [x] lint hard should depend on document_throws and enable the dt plugin with
 instructions on how to disable any of our custom lints.
 
+- [x] optimise the code and improve the code structure.
 
