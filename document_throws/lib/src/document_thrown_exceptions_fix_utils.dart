@@ -19,6 +19,7 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
   Iterable<ResolvedUnitResult> libraryUnits, {
   ThrowsCacheLookup? externalLookup,
   bool includeSource = false,
+  bool honorDocMentions = true,
   DocumentationStyle documentationStyle = DocumentationStyle.docComment,
   ExecutableTarget? onlyTarget,
 }) {
@@ -40,7 +41,7 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
     final hasDocThrowingTags = _hasDocThrowingTags(
       target.documentationComment,
     );
-    final removeOtherStyle = documentationStyle == DocumentationStyle.docComment
+    var removeOtherStyle = documentationStyle == DocumentationStyle.docComment
         ? hasThrowingAnnotations
         : hasDocThrowingTags;
     final needsProvenanceCleanup =
@@ -61,9 +62,15 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
             target.metadata,
             documentationComment: target.documentationComment,
             documentationStyle: documentationStyle,
+            honorDocMentions: honorDocMentions,
             unitsByPath: unitsByPath,
             externalLookup: externalLookup,
           );
+    if (documentationStyle == DocumentationStyle.annotation &&
+        honorDocMentions &&
+        thrownInfos.isEmpty) {
+      removeOtherStyle = false;
+    }
     if (thrownInfos.isEmpty && !removeOtherStyle) continue;
 
     final commentStyle = documentationStyle == DocumentationStyle.docComment

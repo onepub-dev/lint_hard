@@ -25,6 +25,7 @@ Future<void> main(List<String> args) async {
 
   final root = Directory.current.path;
   final includeSource = args.contains('--origin');
+  final alwaysAdd = args.contains('--always-add');
   final forceAnnotation = args.contains('--annotation');
   final forceDocComment = args.contains('--doc-comment');
   if (forceAnnotation && forceDocComment) {
@@ -91,6 +92,7 @@ Future<void> main(List<String> args) async {
       libraryResult.units,
       externalLookup: externalLookup,
       includeSource: includeSource,
+      honorDocMentions: !alwaysAdd,
       documentationStyle: documentationStyle,
     );
     if (editsByFile.isEmpty) continue;
@@ -192,8 +194,12 @@ void _printUsage() {
   stdout.writeln('');
   stdout.writeln('Options:');
   stdout.writeln('  --origin       Include call/origin provenance in @Throwing.');
-  stdout.writeln('  --annotation   Use @Throwing annotations instead of doc comments.');
-  stdout.writeln('  --doc-comment  Force doc comment output (default).');
+  stdout.writeln(
+    '  --always-add  Add @Throwing even when doc comments mention the '
+    'exception.',
+  );
+  stdout.writeln('  --annotation  Use @Throwing annotations instead of doc comments.');
+  stdout.writeln('  --doc-comment Force doc comment output (default).');
   stdout.writeln('');
   stdout.writeln('Examples:');
   stdout.writeln("  document_throws_fix 'lib/**/*.dart'");

@@ -227,6 +227,7 @@ Set<String> missingThrownTypeDocs(
   Comment? documentationComment,
   DocumentationStyle documentationStyle = DocumentationStyle.docComment,
   bool allowSourceFallback = false,
+  bool honorDocMentions = true,
   Map<String, CompilationUnit>? unitsByPath,
   UnitProvider? unitProvider,
   ThrowsCacheLookup? externalLookup,
@@ -238,6 +239,7 @@ Set<String> missingThrownTypeDocs(
     documentationComment: documentationComment,
     documentationStyle: documentationStyle,
     allowSourceFallback: allowSourceFallback,
+    honorDocMentions: honorDocMentions,
     unitsByPath: unitsByPath,
     unitProvider: unitProvider,
     externalLookup: externalLookup,
@@ -252,6 +254,7 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
   Comment? documentationComment,
   DocumentationStyle documentationStyle = DocumentationStyle.docComment,
   bool allowSourceFallback = false,
+  bool honorDocMentions = true,
   Map<String, CompilationUnit>? unitsByPath,
   UnitProvider? unitProvider,
   ThrowsCacheLookup? externalLookup,
@@ -277,9 +280,19 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
   }
   if (thrownTypes.isEmpty) return const <ThrownTypeInfo>[];
 
-  final documented = documentationStyle == DocumentationStyle.annotation
-      ? _annotationThrownTypes(metadata)
-      : _docCommentMentionedTypes(documentationComment);
+  final documented = <String>{};
+  if (documentationStyle == DocumentationStyle.annotation) {
+    documented.addAll(_annotationThrownTypes(metadata));
+    if (honorDocMentions) {
+      documented.addAll(_docCommentMentionedTypes(documentationComment));
+    }
+  } else {
+    if (honorDocMentions) {
+      documented.addAll(_docCommentMentionedTypes(documentationComment));
+    } else {
+      documented.addAll(_docCommentThrownTypes(documentationComment));
+    }
+  }
   final byName = <String, ThrownTypeInfo>{};
   for (final info in effectiveResults.infos) {
     final existing = byName[info.name];
