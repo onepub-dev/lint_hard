@@ -6,6 +6,7 @@ import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
+import 'package:args/args.dart';
 import 'package:glob/glob.dart';
 import 'package:glob/list_local_fs.dart';
 import 'package:path/path.dart' as p;
@@ -16,27 +17,64 @@ import 'package:document_throws/src/throws_cache_lookup.dart';
 import 'package:document_throws/src/version/version.g.dart';
 
 Future<void> main(List<String> args) async {
-  if (args.contains('-h') || args.contains('--help')) {
-    _printUsage();
+  final parser = ArgParser()
+    ..addFlag(
+      'help',
+      abbr: 'h',
+      negatable: false,
+      help: 'Show usage information.',
+    )
+    ..addFlag(
+      'origin',
+      negatable: false,
+      help: 'Include call/origin provenance in @Throwing.',
+    )
+    ..addFlag(
+      'always-add',
+      negatable: false,
+      help: 'Add @Throwing even when doc comments mention the exception.',
+    )
+    ..addFlag(
+      'annotation',
+      negatable: false,
+      help: 'Use @Throwing annotations instead of doc comments.',
+    )
+    ..addFlag(
+      'doc-comment',
+      negatable: false,
+      help: 'Force doc comment output (default).',
+    );
+
+  ArgResults parsed;
+  try {
+    parsed = parser.parse(args);
+  } on FormatException catch (error) {
+    _printUsage(parser, error: error.message);
+    exitCode = 64;
+    return;
+  }
+
+  if (parsed['help'] == true) {
+    _printUsage(parser);
     return;
   }
 
   stdout.writeln('document_throws_fix $packageVersion');
 
   final root = Directory.current.path;
-  final includeSource = args.contains('--origin');
-  final alwaysAdd = args.contains('--always-add');
-  final forceAnnotation = args.contains('--annotation');
-  final forceDocComment = args.contains('--doc-comment');
+  final includeSource = parsed['origin'] as bool;
+  final alwaysAdd = parsed['always-add'] as bool;
+  final forceAnnotation = parsed['annotation'] as bool;
+  final forceDocComment = parsed['doc-comment'] as bool;
   if (forceAnnotation && forceDocComment) {
-    stderr.writeln('Choose one of --annotation or --doc-comment.');
-    exitCode = 1;
+    _printUsage(parser, error: 'Choose one of --annotation or --doc-comment.');
+    exitCode = 64;
     return;
   }
   final forcedStyle = forceAnnotation
       ? DocumentationStyle.annotation
       : (forceDocComment ? DocumentationStyle.docComment : null);
-  final patterns = args.where((arg) => !arg.startsWith('-')).toList();
+  final patterns = parsed.rest;
   final summaryNotes = <String>[];
   if (includeSource) {
     summaryNotes.add(
@@ -181,25 +219,20 @@ Future<ResolvedLibraryResult?> _resolvedLibraryForFile(
   return libraryResult;
 }
 
-void _printUsage() {
+void _printUsage(ArgParser parser, {String? error}) {
+  if (error != null && error.isNotEmpty) {
+    stderr.writeln(error);
+    stderr.writeln('');
+  }
   stdout.writeln('Apply document_throws fixes to Dart files.');
   stdout.writeln('');
-  stdout.writeln(
-    'Usage: document_throws_fix [--origin] [--annotation|--doc-comment] '
-    '[<glob> ...]',
-  );
+  stdout.writeln('Usage: document_throws_fix [options] [<glob> ...]');
   stdout.writeln('');
   stdout.writeln('If no globs are provided, all .dart files under the');
   stdout.writeln('current directory are processed.');
   stdout.writeln('');
   stdout.writeln('Options:');
-  stdout.writeln('  --origin       Include call/origin provenance in @Throwing.');
-  stdout.writeln(
-    '  --always-add  Add @Throwing even when doc comments mention the '
-    'exception.',
-  );
-  stdout.writeln('  --annotation  Use @Throwing annotations instead of doc comments.');
-  stdout.writeln('  --doc-comment Force doc comment output (default).');
+  stdout.writeln(parser.usage);
   stdout.writeln('');
   stdout.writeln('Examples:');
   stdout.writeln("  document_throws_fix 'lib/**/*.dart'");

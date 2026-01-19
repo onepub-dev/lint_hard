@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:document_throws/src/throws_cache.dart';
@@ -14,18 +15,77 @@ import 'package:document_throws/src/flutter_index.dart' as flutter_index;
 import 'package:document_throws/src/version/version.g.dart';
 
 Future<void> main(List<String> args) async {
-  if (args.contains('-h') || args.contains('--help')) {
-    _printUsage();
+  final parser = ArgParser()
+    ..addFlag(
+      'help',
+      abbr: 'h',
+      negatable: false,
+      help: 'Show usage information.',
+    )
+    ..addFlag(
+      'quiet',
+      abbr: 'q',
+      negatable: false,
+      help: 'Suppress progress output.',
+    )
+    ..addOption(
+      'output',
+      help: 'Directory for .throws cache output.',
+    )
+    ..addFlag(
+      'packages',
+      defaultsTo: true,
+      help: 'Index pub packages from pubspec.lock.',
+    )
+    ..addFlag(
+      'sdk',
+      defaultsTo: true,
+      help: 'Index the Dart SDK.',
+    )
+    ..addFlag(
+      'flutter',
+      defaultsTo: true,
+      help: 'Index Flutter SDK packages.',
+    )
+    ..addFlag(
+      'recreate',
+      negatable: false,
+      help: 'Rebuild indexes even if cache files exist.',
+    );
+
+  ArgResults parsed;
+  try {
+    parsed = parser.parse(args);
+  } on FormatException catch (error) {
+    _printUsage(parser, error: error.message);
+    exitCode = 64;
+    return;
+  }
+
+  if (parsed['help'] == true) {
+    _printUsage(parser);
+    return;
+  }
+
+  if (parsed.rest.isNotEmpty) {
+    _printUsage(
+      parser,
+      error: 'Unexpected arguments: ${parsed.rest.join(' ')}',
+    );
+    exitCode = 64;
     return;
   }
 
   final root = Directory.current.path;
-  final quiet = args.contains('--quiet') || args.contains('-q');
-  final outputRoot = _argValue(args, '--output') ?? _defaultCacheRoot();
-  final includeSdk = !args.contains('--no-sdk');
-  final includeFlutter = !args.contains('--no-flutter');
-  final includePackages = !args.contains('--no-packages');
-  final recreate = args.contains('--recreate');
+  final quiet = parsed['quiet'] as bool;
+  final outputRoot =
+      (parsed['output'] as String?)?.trim().isNotEmpty == true
+          ? parsed['output'] as String
+          : _defaultCacheRoot();
+  final includeSdk = parsed['sdk'] as bool;
+  final includeFlutter = parsed['flutter'] as bool;
+  final includePackages = parsed['packages'] as bool;
+  final recreate = parsed['recreate'] as bool;
   final sdkPath = _sdkPath();
   void log(String message) {
     if (!quiet) stdout.writeln(message);
@@ -333,15 +393,6 @@ String? _sdkRootFromExecutable() {
   return binDir.parent.path;
 }
 
-String? _argValue(List<String> args, String name) {
-  for (final arg in args) {
-    if (arg.startsWith('$name=')) {
-      return arg.substring(name.length + 1);
-    }
-  }
-  return null;
-}
-
 List<_LockedPackage> _readPackageLock(File lockFile) {
   final doc = loadYaml(lockFile.readAsStringSync());
   if (doc is! YamlMap) return const <_LockedPackage>[];
@@ -437,20 +488,22 @@ class _LockedPackage {
   }
 }
 
-
 String _sanitizeId(String raw) {
   if (raw.isEmpty) return 'unknown';
   return raw.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
 }
 
-void _printUsage() {
+void _printUsage(ArgParser parser, {String? error}) {
+  if (error != null && error.isNotEmpty) {
+    stderr.writeln(error);
+    stderr.writeln('');
+  }
   stdout.writeln('Build .throws indexes for external dependencies.');
   stdout.writeln('');
-  stdout.writeln(
-    'Usage: document_throws_index [--no-packages] [--no-sdk] [--no-flutter]',
-  );
-  stdout.writeln('       document_throws_index --output=<path> [-q|--quiet]');
-  stdout.writeln('       document_throws_index --recreate');
+  stdout.writeln('Usage: document_throws_index [options]');
+  stdout.writeln('');
+  stdout.writeln('Options:');
+  stdout.writeln(parser.usage);
 }
 
 String _defaultCacheRoot() {

@@ -1,8 +1,4 @@
 
-- [] dt-fix and dt-index do not show an error and usage when an invalid
-command line arg is passed.  Redo all arg parsing with ArgParser and using the
-appropriate addFlag/option methods.
-
 - [] We are still having problems with the lints thing that any type
 in side a comment with [] is an exception.
 
