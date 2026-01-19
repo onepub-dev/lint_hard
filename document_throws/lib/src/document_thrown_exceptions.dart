@@ -409,8 +409,48 @@ Set<String> _docCommentMentionedTypes(Comment? comment) {
       mentioned.add(normalized);
     }
   }
+  for (final raw in _extractBracketedDocReferences(comment)) {
+    final normalized = _normalizeDocReference(raw);
+    if (normalized != null) {
+      mentioned.add(normalized);
+    }
+  }
   mentioned.addAll(_docCommentThrownTypes(comment));
   return mentioned;
+}
+
+Iterable<String> _extractBracketedDocReferences(Comment comment) sync* {
+  final text = comment.toSource();
+  var index = 0;
+  while (index < text.length) {
+    final open = text.indexOf('[', index);
+    if (open == -1) break;
+    final close = text.indexOf(']', open + 1);
+    if (close == -1) break;
+    yield text.substring(open + 1, close);
+    index = close + 1;
+  }
+}
+
+String? _normalizeDocReference(String raw) {
+  var name = raw.trim();
+  if (name.isEmpty) return null;
+  if (name.startsWith('`') && name.endsWith('`') && name.length > 1) {
+    name = name.substring(1, name.length - 1).trim();
+    if (name.isEmpty) return null;
+  }
+  if (_containsWhitespace(name)) return null;
+  if (name.endsWith('?') && name.length > 1) {
+    name = name.substring(0, name.length - 1);
+  }
+  return _normalizeTypeName(name);
+}
+
+bool _containsWhitespace(String value) {
+  for (var i = 0; i < value.length; i++) {
+    if (value[i].trim().isEmpty) return true;
+  }
+  return false;
 }
 
 String? _commentReferenceName(CommentReference reference) {
