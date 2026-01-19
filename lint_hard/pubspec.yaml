@@ -10,16 +10,12 @@ dependencies:
   analyzer: ^9.0.0
   analyzer_plugin: ^0.13.11
   analysis_server_plugin: ^0.3.4
-  document_throws: ^0.1.0
-  document_throws_annotation: ^0.1.0
+  document_throws:
+    path: ../document_throws
+  document_throws_annotation:
+    path: ../document_throws_annotation
   glob: ^2.1.2
   path: ^1.9.0
   yaml: ^3.1.2
 dev_dependencies:
   test: ^1.25.0
-
-dependency_overrides:
-  document_throws:
-    path: ../document_throws
-  document_throws_annotation:
-    path: ../document_throws_annotation
