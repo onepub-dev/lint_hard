@@ -1,22 +1,24 @@
-# Lint Hard 
+# Lint Hard
 
-The objective of lint_hard is to reduced the accumulation of technical debt by improving code quality and consistency whilst turning runtime errors into compile time errors.
+The objective of lint_hard is to reduce the accumulation of technical debt by
+improving code quality and consistency while turning runtime errors into
+compile time errors.
+
+Lint Hard uses strict type checks to improve code clarity and remove ambiguity
+in loosely typed code. It turns many common runtime errors into compile time
+errors, and that usually saves more time than it costs to address lints.
+
+Lint Hard forces consistent standards across your code base, which makes it
+easier to read and maintain.
+
+## Drop-in replacement
+You can use Lint Hard as a drop-in replacement for existing lint packages
+(pedantic, lints, flutter_lints).
 
 
-Lint Hard employs strong mode type saftey to improve code clarity and remove 'ambiguity of intent' found in typeless or softly typed code.
-
-Lint Hard turns many of the common runtime errors into compile time errors. The rule of thumb is that it is 10 times harder to fix a runtime error than a compiler error. Lint Hard will save you time and frustration.  
-
-Using Lint Hard will require you to do a little more work as you code but will significantly reduce runtime errors, saving far more time than you will spend cleaning your lints. The `dart fix` command also automates fixing many of the most common lints reducing the workload.
-
-Lint Hard forces you to use consistent standards across your code base which makes it easier for other developers to read your code. It will also help when you come back to your code in 12 months time.
-
-## drop in replacement
-You can use Lint Hard as a drop in replacement for your existing lint package (pedantic, lints, flutter_lints ...).
-
-
-## what lints are included
-Lint Hard includes every non-clashing dart lint and enables strong mode type checks. We do remove a few lints that make little sense given our objectives.
+## What lints are included
+Lint Hard includes every non-clashing Dart lint and enables strict language
+checks. A few lints that conflict with these goals are disabled.
 
 ```yaml
 analyzer:
@@ -24,14 +26,11 @@ analyzer:
     strict-casts: true
     strict-inference: true
     strict-raw-types: true
-  strong-mode:
-    implicit-casts: false
-    implicit-dynamic: false
 ```
 
-You can see the full set of lints in the analysis_options.yaml file.
+You can see the full set of lints in `package:lint_hard/all.yaml`.
 
-## installing Lint Hard
+## Installing Lint Hard
 
 1. Check in any existing code changes.
 2. Run `dart format` and check in the formatting changes.
@@ -45,19 +44,18 @@ You can see the full set of lints in the analysis_options.yaml file.
 
     ```yaml
     include: package:lint_hard/all.yaml
-    # enable lint_hard custom lints - these add a performance overhead of 
-    # about 20 seconds to the first run of dart analyze
+
     plugins:
       lint_hard:
+        diagnostics:
+          document_thrown_exceptions: true
+          throws_index_up_to_date: true
+          fields_first_constructors_next: true
+          throwing_unthrown_exception: true
     ```
 
    To disable custom lint_hard plugin lints while keeping the lint set,
-   override the plugin list:
-
-   ```yaml
-   analyzer:
-     plugins: []
-   ```
+   remove the `plugins` block or set the diagnostics to `false`.
 
 5. Remove any existing lint packages (lints, pedantic, flutter_lints) from
 your `pubspec.yaml` and `analysis_options.yaml`.
@@ -67,20 +65,15 @@ your `pubspec.yaml` and `analysis_options.yaml`.
 9. Restart the Dart analysis server in your IDE.
 
 ## Manually fixing lints
-The `dart fix` command will not fix all of your lints, so you now need to 
-work through the remaing lints by hand.
+The `dart fix` command will not fix all lints, so you will need to work through
+the remaining lints by hand.
 
-This can be a bit overwhelming to begin with, so I recommend a couple of 
-approaches.
-Filter the list of warnings (most IDEs allow this) and focus on fixing
-one type of lint at a time.
-If you can't fix all of the lints immediately you can temporarily disable
-some lints via adding a rule to your `analysis_options.yaml`.
-Remember to go back and re-enable them as you slow work through the full
-set of lints.
+This can be overwhelming at first. Filtering warnings and tackling one rule at
+a time usually helps. If you cannot fix everything immediately, temporarily
+disable specific rules and re-enable them as you make progress.
 
-Don't get discourage once you have fixed all of your lints, new warnings
-will be fewer and easier to fix.
+After you fix the initial batch, new warnings tend to be fewer and easier to
+handle.
 
 e.g.
 ```yaml
@@ -89,7 +82,7 @@ linter:
     avoid_print: false
 ```
 
-## Consle app development
+## Console app development
 For console apps that use `print`, add this to `analysis_options.yaml`:
 
 ```yaml
@@ -141,7 +134,7 @@ The Lint Hard project also offers the following advice to help you improve the o
 
 Or you can just jump to the bottom of this page to [install](#installing-lint-hard) Lint Hard.
 
-## dart format
+## Dart format
 We strongly recommend that you use `dart format` to format your code.  Whilst personally I don't like some of the formatting decisions imposed by dart format, consistency is more important.  Don't fight this one. Just run `dart format` with no options. You will get used to the format and it makes sharing code with other developers easier. 
 Using `dart format` will also make it easier for you to read other developer's code as `dart format` is almost universally used in the Dart community.
 
@@ -152,10 +145,10 @@ Use an IDE like vs-code that automatically formats your code each time you save 
 **_Only commit code that has been formatted._**
 
 
-## a word to JavaScript developers
+## A word to JavaScript developers
 If you are coming from the JavaScript world, enforcing type declarations may initially feel burdensome but you will quickly see that it allows you to develop faster and release quality code sooner.   
 
-## avoid dynamic and Object types
+## Avoid dynamic and Object types
 
 For the most part you should never use the dynamic type and rarely use the Object type.
 
@@ -190,7 +183,7 @@ Use techniques such as default values and (carefully) the `late` keyword.
 
 
 
-## customizing the predefined lint sets
+## Customizing the predefined lint sets
 
 You can customize the predefined lint set, both to disable a
 lint or to add additional lints. For details see

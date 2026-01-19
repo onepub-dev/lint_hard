@@ -1,3 +1,8 @@
+# Unreleased
+- added the `throwing_unthrown_exception` lint for `@Throwing` types that are not thrown.
+- improved `document_throws_fix` handling for provenance cleanup and doc comment formatting.
+- clarified plugin configuration and documentation.
+
 # 7.0.1
 - re-ordered the readme so that the install instructions are closer to the top.
 

@@ -11,8 +11,8 @@ Add to `analysis_options.yaml`:
 plugins:
   document_throws:
     diagnostics:
-      - document_thrown_exceptions
-      - throws_index_up_to_date
+      document_thrown_exceptions: true
+      throws_index_up_to_date: true
 ```
 
 Doc comment example:
