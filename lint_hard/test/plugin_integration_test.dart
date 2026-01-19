@@ -37,18 +37,31 @@ plugins:
     diagnostics:
       - document_thrown_exceptions
       - fields_first_constructors_next
+      - throwing_unknown_type
 ''',
       );
 
       await _writeFile(
         _joinPath(packageDir.path, 'lib/sample.dart'),
         '''
+import 'package:document_throws_annotation/document_throws_annotation.dart';
+
 class BadStateException implements Exception {}
 
 class Thrower {
   void undocumented() {
     throw BadStateException();
   }
+}
+
+/// @Throwing(UnknownDocException)
+void docUnknown() {
+  throw BadStateException();
+}
+
+@Throwing(UnknownAnnotationException)
+void annotationUnknown() {
+  throw BadStateException();
 }
 
 class BadOrder {
@@ -88,6 +101,7 @@ class BadOrder {
       final codes = channel.analysisErrors.map((e) => e.code).toSet();
       expect(codes, contains('document_thrown_exceptions'));
       expect(codes, contains('fields_first_constructors_next'));
+      expect(codes, contains('throwing_unknown_type'));
     } finally {
       await tempDir.delete(recursive: true);
     }
