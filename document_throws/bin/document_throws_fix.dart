@@ -43,8 +43,8 @@ Future<void> main(List<String> args) async {
       'Including provenance in @Throwing annotations (--origin).',
     );
     summaryNotes.add(
-      'To remove provenance, rerun document_throws_fix without --origin after '
-      'removing existing @Throwing entries.',
+      'To remove provenance, rerun document_throws_fix without --origin to '
+      'rewrite existing @Throwing entries without provenance.',
     );
   }
   final files = await _collectDartFiles(patterns, root);
