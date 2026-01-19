@@ -53,6 +53,10 @@ class Sample {
   /// Throws [BadStateException].
   void mentionedNoThrow() {}
 
+  /// Run dart pub global activate for a package located in [path]
+  /// relative to the current directory.
+  void mentionedNonThrow(String path) {}
+
   /// @Throwing(BadStateException)
   void annotatedMissingException() {
     throw BadStateException();

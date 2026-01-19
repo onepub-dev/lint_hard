@@ -133,6 +133,24 @@ void main() {
     expect(mentioned, equals({'BadStateException'}));
   });
 
+  test('ignores doc comment references without throw wording', () {
+    final method = findMethod(unit, 'mentionedNonThrow');
+    final missing = _missing(
+      method.body,
+      method.metadata,
+      method.documentationComment,
+      allowSourceFallback: true,
+    );
+    final mentioned = docCommentMentionsWithoutThrows(
+      method.body,
+      method.documentationComment,
+      unitsByPath: unitsByPath,
+    );
+
+    expect(missing, isEmpty);
+    expect(mentioned, isEmpty);
+  });
+
   test('ignores throws caught without rethrow', () {
     final method = findMethod(unit, 'throwCaughtWithoutOn');
     final missing = _missing(
