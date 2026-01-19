@@ -10,7 +10,7 @@ import 'throws_cache_lookup.dart';
 class ThrowsIndexUpToDate extends AnalysisRule {
   static const LintCode code = LintCode(
     'throws_index_up_to_date',
-    'Throws cache is missing or out of date.',
+    'Throws cache is missing or out of date (missing: {0}).',
     correctionMessage: 'Run document_throws_index to refresh the throws cache.',
   );
 
@@ -55,7 +55,16 @@ class _Visitor extends SimpleAstVisitor<void> {
     final missing = lookup.missingCaches();
     if (missing.isEmpty) return;
 
+    final firstMissing = _firstMissingLabel(missing);
+    if (firstMissing == null) return;
+
     final token = node.beginToken;
-    rule.reportAtToken(token);
+    rule.reportAtToken(token, arguments: [firstMissing]);
   }
+}
+
+String? _firstMissingLabel(MissingThrowsCaches missing) {
+  if (missing.sdkMissing) return 'sdk';
+  if (missing.missingPackages.isEmpty) return null;
+  return missing.missingPackages.first;
 }

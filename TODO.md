@@ -1,1 +1,2 @@
-No pending tasks.
+
+- [] Document how to use the alternate annotation method
