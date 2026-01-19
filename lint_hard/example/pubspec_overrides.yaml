@@ -1,5 +1,5 @@
 dependency_overrides:
   document_throws:
     path: ../../document_throws
-  throws_annotations:
-    path: ../../throws_annotations
+  document_throws_annotation:
+    path: ../../document_throws_annotation

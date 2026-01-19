@@ -92,19 +92,24 @@ linter:
 
 ## documenting thrown exceptions
 
-The `document_thrown_exceptions` lint uses the `@Throws` annotation.
+The `document_thrown_exceptions` lint uses `@Throwing` tags in doc comments by
+default. You can also use `@Throwing` annotations with the annotation package.
 
-Example:
+Doc comment example:
+
+```dart
+/// @Throwing(FormatException)
+void parseInput(String value) {
+  throw FormatException('Invalid input');
+}
+```
+
+Annotation example:
 
 ```dart
 import 'package:lint_hard/throws.dart';
 
-@Throws(FormatException)
-void parseInput(String value) {
-  throw FormatException('Invalid input');
-}
-
-@Throws(FormatException, reason: 'Bad format')
+@Throwing(FormatException, reason: 'Bad format')
 void parseWithReason(String value) {
   throw FormatException('Invalid input');
 }
@@ -113,12 +118,12 @@ void parseWithReason(String value) {
 Build the external throws cache once per SDK or package update:
 
 ```terminal
-lint_hard_index
+document_throws_index
 ```
 
 Use `--no-sdk`, `--no-packages`, or `--no-flutter` to limit indexing.
 
-In VS Code you can view `@Throws` annotations using Peek Definition:
+In VS Code you can view `@Throwing` annotations using Peek Definition:
 right-click the function name and select "Peek Definition", or press
 `Alt+F12` with the caret on the symbol.
 

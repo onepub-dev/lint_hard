@@ -1,10 +1,10 @@
-class Throws {
+class Throwing {
   final Type type;
   final String? reason;
   final String? call;
   final String? origin;
 
-  const Throws(
+  const Throwing(
     this.type, {
     this.reason,
     this.call,

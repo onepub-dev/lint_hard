@@ -28,12 +28,14 @@ void main() {
 
   Set<String> _missing(
     FunctionBody body,
-    NodeList<Annotation>? metadata, {
+    NodeList<Annotation>? metadata,
+    Comment? documentationComment, {
     bool allowSourceFallback = false,
   }) {
     return missingThrownTypeDocs(
       body,
       metadata,
+      documentationComment: documentationComment,
       allowSourceFallback: allowSourceFallback,
       unitsByPath: unitsByPath,
     );
@@ -44,6 +46,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
     );
 
     expect(missing, equals({'BadStateException'}));
@@ -54,6 +57,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
     );
 
     expect(missing, equals({'BadStateException'}));
@@ -64,6 +68,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
     );
 
     expect(missing, equals({'MissingFileException'}));
@@ -74,6 +79,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
     );
 
     expect(missing, isEmpty);
@@ -84,6 +90,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
     );
 
     expect(missing, equals({'MissingFileException'}));
@@ -115,6 +122,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
     );
 
     expect(missing, equals({'BadStateException'}));

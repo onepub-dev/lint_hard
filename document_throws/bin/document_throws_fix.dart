@@ -11,6 +11,7 @@ import 'package:glob/list_local_fs.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:document_throws/src/document_thrown_exceptions_fix_utils.dart';
+import 'package:document_throws/src/documentation_style.dart';
 import 'package:document_throws/src/throws_cache_lookup.dart';
 import 'package:document_throws/src/version/version.g.dart';
 
@@ -24,14 +25,24 @@ Future<void> main(List<String> args) async {
 
   final root = Directory.current.path;
   final includeSource = args.contains('--origin');
+  final forceAnnotation = args.contains('--annotation');
+  final forceDocComment = args.contains('--doc-comment');
+  if (forceAnnotation && forceDocComment) {
+    stderr.writeln('Choose one of --annotation or --doc-comment.');
+    exitCode = 1;
+    return;
+  }
+  final forcedStyle = forceAnnotation
+      ? DocumentationStyle.annotation
+      : (forceDocComment ? DocumentationStyle.docComment : null);
   final patterns = args.where((arg) => !arg.startsWith('-')).toList();
   if (includeSource) {
     stdout.writeln(
-      'Including provenance in @Throws annotations (--origin).',
+      'Including provenance in @Throwing annotations (--origin).',
     );
     stdout.writeln(
       'To remove provenance, rerun document_throws_fix without --origin after '
-      'removing existing @Throws annotations.',
+      'removing existing @Throwing entries.',
     );
   }
   final files = await _collectDartFiles(patterns, root);
@@ -45,6 +56,7 @@ Future<void> main(List<String> args) async {
   final libraryCache = <String, ResolvedLibraryResult>{};
   final editsByPath = <String, List<SourceEdit>>{};
   final lookupByRoot = <String, ThrowsCacheLookup?>{};
+  final styleByRoot = <String, DocumentationStyle>{};
 
   for (final filePath in files) {
     final context = collection.contextFor(filePath);
@@ -66,11 +78,19 @@ Future<void> main(List<String> args) async {
             rootPath,
             () => ThrowsCacheLookup.forProjectRoot(rootPath),
           );
+    final documentationStyle = forcedStyle ??
+        (rootPath == null
+            ? DocumentationStyle.docComment
+            : styleByRoot.putIfAbsent(
+                rootPath,
+                () => documentationStyleForRoot(rootPath),
+              ));
     final editsByFile = documentThrownExceptionEdits(
       unitResult,
       libraryResult.units,
       externalLookup: externalLookup,
       includeSource: includeSource,
+      documentationStyle: documentationStyle,
     );
     if (editsByFile.isEmpty) continue;
 
@@ -158,13 +178,18 @@ Future<ResolvedLibraryResult?> _resolvedLibraryForFile(
 void _printUsage() {
   stdout.writeln('Apply document_throws fixes to Dart files.');
   stdout.writeln('');
-  stdout.writeln('Usage: document_throws_fix [--origin] [<glob> ...]');
+  stdout.writeln(
+    'Usage: document_throws_fix [--origin] [--annotation|--doc-comment] '
+    '[<glob> ...]',
+  );
   stdout.writeln('');
   stdout.writeln('If no globs are provided, all .dart files under the');
   stdout.writeln('current directory are processed.');
   stdout.writeln('');
   stdout.writeln('Options:');
-  stdout.writeln('  --origin  Include call/origin provenance in @Throws.');
+  stdout.writeln('  --origin       Include call/origin provenance in @Throwing.');
+  stdout.writeln('  --annotation   Use @Throwing annotations instead of doc comments.');
+  stdout.writeln('  --doc-comment  Force doc comment output (default).');
   stdout.writeln('');
   stdout.writeln('Examples:');
   stdout.writeln("  document_throws_fix 'lib/**/*.dart'");

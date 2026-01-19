@@ -7,8 +7,7 @@ class Thrower {
     throw BadStateException();
   }
 
-  /// Throws [BadStateException] when invalid.
-  @Throws(BadStateException)
+  /// @Throwing(BadStateException)
   Thrower.named() {
     throw BadStateException();
   }
@@ -17,7 +16,7 @@ class Thrower {
     throw BadStateException();
   }
 
-  /// Throws [BadStateException] when invalid.
+  /// @Throwing(BadStateException)
   void documentedMethod() {
     throw BadStateException();
   }
@@ -27,7 +26,7 @@ void undocumentedTopLevel() {
   throw BadStateException();
 }
 
-/// Throws [BadStateException] when invalid.
+/// @Throwing(BadStateException)
 void documentedTopLevel() {
   throw BadStateException();
 }

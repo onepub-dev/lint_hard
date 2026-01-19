@@ -28,13 +28,15 @@ void main() {
 
   Set<String> _missing(
     FunctionBody body,
-    NodeList<Annotation>? metadata, {
+    NodeList<Annotation>? metadata,
+    Comment? documentationComment, {
     bool allowSourceFallback = false,
     ThrowsCacheLookup? externalLookup,
   }) {
     return missingThrownTypeDocs(
       body,
       metadata,
+      documentationComment: documentationComment,
       allowSourceFallback: allowSourceFallback,
       unitsByPath: unitsByPath,
       externalLookup: externalLookup,
@@ -46,17 +48,19 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
     expect(missing, equals({'BadStateException'}));
   });
 
-  test('accepts annotated thrown types in methods', () {
+  test('accepts documented thrown types in methods', () {
     final method = findMethod(unit, 'documentedMethod');
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -68,28 +72,31 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
     expect(missing, isEmpty);
   });
 
-  test('accepts annotation with multiple thrown types', () {
+  test('accepts documented list of thrown types', () {
     final method = findMethod(unit, 'documentedThrowsList');
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
     expect(missing, isEmpty);
   });
 
-  test('accepts annotation with reason', () {
+  test('accepts documented reason', () {
     final method = findMethod(unit, 'documentedThrowsWithReason');
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -101,6 +108,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -112,6 +120,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -123,6 +132,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -134,6 +144,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -145,6 +156,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -156,6 +168,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -167,6 +180,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -178,6 +192,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       externalLookup: TestThrowsCacheLookup(),
     );
 
@@ -189,6 +204,7 @@ void main() {
     final missing = _missing(
       method.body,
       method.metadata,
+      method.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -200,17 +216,19 @@ void main() {
     final missing = _missing(
       ctor.body,
       ctor.metadata,
+      ctor.documentationComment,
       allowSourceFallback: true,
     );
 
     expect(missing, equals({'BadStateException'}));
   });
 
-  test('accepts annotated thrown types in named constructors', () {
+  test('accepts documented thrown types in named constructors', () {
     final ctor = findConstructor(unit, className: 'Sample', name: 'named');
     final missing = _missing(
       ctor.body,
       ctor.metadata,
+      ctor.documentationComment,
       allowSourceFallback: true,
     );
 
@@ -222,17 +240,19 @@ void main() {
     final missing = _missing(
       fn.functionExpression.body,
       fn.metadata,
+      fn.documentationComment,
       allowSourceFallback: true,
     );
 
     expect(missing, equals({'BadStateException'}));
   });
 
-  test('accepts annotated thrown types in top-level functions', () {
+  test('accepts documented thrown types in top-level functions', () {
     final fn = findFunction(unit, 'documentedTopLevel');
     final missing = _missing(
       fn.functionExpression.body,
       fn.metadata,
+      fn.documentationComment,
       allowSourceFallback: true,
     );
 

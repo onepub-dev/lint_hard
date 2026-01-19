@@ -9,6 +9,7 @@ import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:document_throws/src/document_thrown_exceptions.dart';
 import 'package:document_throws/src/document_thrown_exceptions_fix.dart';
 import 'package:document_throws/src/document_thrown_exceptions_fix_utils.dart';
+import 'package:document_throws/src/documentation_style.dart';
 import 'package:test/test.dart';
 
 import 'support/document_thrown_exceptions_helpers.dart';
@@ -87,25 +88,27 @@ void main() {
     return _applyEdits(content, edits);
   }
 
-  test('fix inserts throws annotations for rethrown exceptions', () async {
+  test('fix inserts @Throwing doc comments for rethrown exceptions', () async {
     final method = findMethod(unit, 'throwCaughtWithRethrow');
     final updated = await _applyFix(method);
 
     expect(
       updated,
-      contains('@Throws(BadStateException)\n  void throwCaughtWithRethrow('),
+      contains(
+        '/// @Throwing(BadStateException)\n  void throwCaughtWithRethrow(',
+      ),
     );
   });
 
-  test('fix inserts throws annotations for multiple exceptions', () async {
+  test('fix inserts @Throwing doc comments for multiple exceptions', () async {
     final method = findMethod(unit, 'undocumentedMultipleThrows');
     final updated = await _applyFix(method);
 
     expect(
       updated,
       contains(
-        '@Throws(BadStateException)\n'
-        '  @Throws(MissingFileException)\n'
+        '/// @Throwing(BadStateException)\n'
+        '  /// @Throwing(MissingFileException)\n'
         '  void undocumentedMultipleThrows(',
       ),
     );
@@ -116,40 +119,40 @@ void main() {
     final updated = await _applyFix(method);
 
     final match = RegExp(
-      r'@Throws\(BadStateException\)\s+void duplicatedThrows',
+      r'/// @Throwing\(BadStateException\)\s+void duplicatedThrows',
     ).allMatches(updated);
     expect(match.length, equals(1));
   });
 
-  test('fix adds missing @Throws annotations', () async {
+  test('fix adds missing @Throwing doc comments', () async {
     final method = findMethod(unit, 'annotatedMissingException');
     final updated = await _applyFix(method);
 
     expect(
       updated,
       contains(
-        '@Throws(BadStateException)\n'
-        '  @Throws(MissingFileException)\n'
+        '/// @Throwing(BadStateException)\n'
+        '  /// @Throwing(MissingFileException)\n'
         '  void annotatedMissingException(',
       ),
     );
   });
 
-  test('fix adds @Throws annotations with reason', () async {
+  test('fix adds @Throwing doc comments with reason', () async {
     final method = findMethod(unit, 'annotatedMissingExceptionWithSpec');
     final updated = await _applyFix(method);
 
     expect(
       updated,
       contains(
-        "@Throws(BadStateException, reason: 'bad')\n"
-        '  @Throws(MissingFileException)\n'
+        "/// @Throwing(BadStateException, reason: 'bad')\n"
+        '  /// @Throwing(MissingFileException)\n'
         '  void annotatedMissingExceptionWithSpec(',
       ),
     );
   });
 
-  test('fix inserts throws import when missing', () async {
+  test('fix uses doc comments without adding import by default', () async {
     final fixturePath = 'test/fixtures/document_thrown_exceptions_no_import.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
     final resolved = await resolveFixture(fixtureFilePath);
@@ -183,9 +186,39 @@ void main() {
     final updated = _applyEdits(content, fileEdits);
     expect(
       updated,
-      contains("import 'package:throws_annotations/throws_annotations.dart';"),
+      isNot(
+        contains(
+          "import 'package:document_throws_annotation/document_throws_annotation.dart';",
+        ),
+      ),
     );
-    expect(updated, contains('@Throws(BadStateException)'));
+    expect(updated, contains('/// @Throwing(BadStateException)'));
+  });
+
+  test('fix inserts annotation import in annotation mode', () async {
+    final fixturePath = 'test/fixtures/document_thrown_exceptions_no_import.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      documentationStyle: DocumentationStyle.annotation,
+    );
+    expect(editsByFile, isNotEmpty);
+
+    final fileEdits = editsByFile[fixtureFilePath];
+    expect(fileEdits, isNotNull);
+    fileEdits!.sort((a, b) => b.offset.compareTo(a.offset));
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, fileEdits);
+    expect(
+      updated,
+      contains(
+        "import 'package:document_throws_annotation/document_throws_annotation.dart';",
+      ),
+    );
+    expect(updated, contains('@Throwing(BadStateException)'));
   });
 
   test('fix prefixes throws types for aliased imports', () async {
@@ -224,12 +257,13 @@ void main() {
 
     expect(
       updated,
-      contains(
-        "import 'package:throws_annotations/throws_annotations.dart';\n"
-        "import 'package:yaml/yaml.dart' as y;\n",
+      isNot(
+        contains(
+          "import 'package:document_throws_annotation/document_throws_annotation.dart';",
+        ),
       ),
     );
-    expect(updated, contains('@Throws(y.YamlException)\n'));
+    expect(updated, contains('/// @Throwing(y.YamlException)\n'));
   });
 
   test('fix prefixes external throws types for aliased imports', () async {
@@ -248,55 +282,39 @@ void main() {
 
     final content = await File(fixtureFilePath).readAsString();
     final updated = _applyEdits(content, edits);
-    expect(updated, contains('@Throws(y.YamlException)\n'));
+    expect(updated, contains('/// @Throwing(y.YamlException)\n'));
   });
 
-  test('fix keeps import and annotation formatting', () async {
+  test('fix keeps import ordering in annotation mode', () async {
     final fixturePath =
         'test/fixtures/document_thrown_exceptions_with_imports.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
     final resolved = await resolveFixture(fixtureFilePath);
     final fn = findFunction(resolved.unit.unit, 'undocumentedTopLevel');
 
-    final diagnostic = Diagnostic.forValues(
-      source: resolved.unit.libraryFragment.source,
-      offset: fn.name.offset,
-      length: fn.name.length,
-      diagnosticCode: DocumentThrownExceptions.code,
-      message: DocumentThrownExceptions.code.problemMessage,
-      correctionMessage: DocumentThrownExceptions.code.correctionMessage,
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      documentationStyle: DocumentationStyle.annotation,
     );
-
-    final producerContext = CorrectionProducerContext.createResolved(
-      libraryResult: resolved.library,
-      unitResult: resolved.unit,
-      diagnostic: diagnostic,
-      selectionOffset: fn.name.offset,
-      selectionLength: fn.name.length,
-    );
-    final fix = DocumentThrownExceptionsFix(context: producerContext);
-    final builder = ChangeBuilder(session: resolved.unit.session);
-    await fix.compute(builder);
-
-    final fileEdits = _collectFileEdits(
-      builder.sourceChange.edits,
-      fixtureFilePath,
-    );
+    final fileEdits = editsByFile[fixtureFilePath];
+    expect(fileEdits, isNotNull);
+    fileEdits!.sort((a, b) => b.offset.compareTo(a.offset));
     final content = await File(fixtureFilePath).readAsString();
     final updated = _applyEdits(content, fileEdits);
 
     final importBlock = RegExp(
       r"import 'dart:io';\n"
       r"\n?"
+      r"import 'package:document_throws_annotation/document_throws_annotation\.dart';\n"
       r"import 'package:path/path\.dart';\n"
-      r"import 'package:throws_annotations/throws_annotations\.dart';\n"
       r"\n*const sortkeyOption = 'sortkey';",
     );
     expect(updated, matches(importBlock));
     expect(
       updated,
       contains(
-        '@Throws(BadStateException)\n'
+        '@Throwing(BadStateException)\n'
         'void undocumentedTopLevel(',
       ),
     );
@@ -342,15 +360,16 @@ void main() {
     expect(updated, contains("const outputOption = 'output';\n"));
     expect(
       updated,
-      contains(
-        "import 'package:path/path.dart';\n"
-        "import 'package:throws_annotations/throws_annotations.dart';\n",
+      isNot(
+        contains(
+          "import 'package:document_throws_annotation/document_throws_annotation.dart';",
+        ),
       ),
     );
-    expect(updated, contains('@Throws(ArgumentError)\nvoid dsort('));
+    expect(updated, contains('/// @Throwing(ArgumentError)\nvoid dsort('));
   });
 
-  test('fix inserts annotation after doc comment', () async {
+  test('fix appends @Throwing tags to doc comments', () async {
     final fixturePath =
         'test/fixtures/document_thrown_exceptions_doc_comment.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
@@ -387,7 +406,7 @@ void main() {
       updated,
       contains(
         '/// Sets the permissions on a file.\n'
-        '@Throws(ChModException)\n'
+        '/// @Throwing(ChModException)\n'
         'void chmod(',
       ),
     );

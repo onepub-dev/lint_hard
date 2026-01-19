@@ -1,3 +1,3 @@
 dependency_overrides:
-  throws_annotations:
-    path: ../throws_annotations
+  document_throws_annotation:
+    path: ../document_throws_annotation

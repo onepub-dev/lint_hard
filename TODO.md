@@ -2,7 +2,7 @@
 - [x] can the throws annotation allow the user to add a description for
 each throw - i.e a reason is thrown.
 
-- [x] add tests where the fix updates an existing @Throws annotation to add/remove
+- [x] add tests where the fix updates an existing @Throwing annotation to add/remove
 a new exception. With and without a ThrowsSpec.
 
 - [x] Add a lint that warns the user if the throws index is out of date
@@ -12,9 +12,9 @@ i.e. an new sdk or package version exists for which we don't have an index.
 
 - [x] and an exe statement to the pubspec.yaml for each of the binaries.
 
-- [x] Update fixes to use the throws cache when adding @Throws for external calls.
+- [x] Update fixes to use the throws cache when adding @Throwing for external calls.
 
-- [x] Document @Throws usage in README for document_thrown_exceptions.
+- [x] Document @Throwing usage in README for document_thrown_exceptions.
 
 - [x] Add a small cache fixture test that reads a real .throws file (not stubbed).
 
@@ -24,7 +24,7 @@ i.e. an new sdk or package version exists for which we don't have an index.
 mulitiple @throws to method/function/... as needed. This also gives us a simplier
 syntax for providing the reason.  
 ```
-@Throws(BadState, reason: "xxxx")
+@Throwing(BadState, reason: "xxxx")
 ```
 The reason is optional. 
 This still doesn't show throw list in documentation, but after making
@@ -32,7 +32,7 @@ a call the linter will warn you about new exceptions that are thrown.
 
 - [x] The lint error should show the list of missing exception types.
 
-- [x] AFter adding a Throws annotation the method is still show the missing
+- [x] AFter adding a Throwing annotation the method is still show the missing
 exception lint.
 
 - [x] there is a question around the source of a throws clause. 
@@ -44,13 +44,13 @@ maybe the call that throws it.  Perhaps we only do this if the throws
 isn't documented - which means we need to parse doc comments again.
 The fact that the exception is documented or not could be added to our index.
 
-- [] so the downside to an annotation is that the users production code
+- [x] so the downside to an annotation is that the users production code
 now has to rely on lint_hard.  Should we have a separate package for the
 annotation so dependency is small and introduces no transient dependencies.
 I'm also considering moving this whole throws lint into its own package 
 as some people wont' what the rest of what lint_hard brings with it.
 
-- [] what is our objective - to document what exceptions are thrown by
+- [x] what is our objective - to document what exceptions are thrown by
 the users own code as well as 3rd party packages and the dart and flutter sdks.
 I'm concerned that by using an annotation the vs-code (and other) IDE won't show
 the exceptions - particurly for external packges. Do we need an vs-code/andriod studio
@@ -59,7 +59,7 @@ extension so that these are show. Can we get the ide teams to support our annota
 - [x] index tool needs to index the flutter sdk.
 
 
-- [x] if an exception listed in the @Throws declaration is from an alised import
+- [x] if an exception listed in the @Throwing declaration is from an alised import
 then the lint fix commend generates an error as the exception is unkown due to the 
 missing alias prefix. 
 ```
@@ -73,7 +73,7 @@ class MyYaml {
   late y.YamlDocument _document;
 
   /// read yaml from string
-@Throws([YamlException])
+@Throwing([YamlException])
   MyYaml.fromString(String content) {
     _document = _load(content);
   }
@@ -89,18 +89,18 @@ class MyYaml {
 
 
  - [x] move the throws lint and associated tooling into its own package document_throws.
- - [] the @Throws annotation should be placed in its own package as its needed for 
+ - [x] the @Throwing annotation should be placed in its own package as its needed for 
  production code not just a dev dependency - is there any advantage to this, 
  we still get dev conflicts.
 
- - [] consider change where we store the indices so that a dart pub cache reset
+ - [x] consider change where we store the indices so that a dart pub cache reset
  also resets our indicies - can we safely store index in the existing package
  directory?
 
- - [] Do we need to document what a lambda throws? How would we do this.
+ - [x] Do we need to document what a lambda throws? How would we do this.
 
- - [] when parsing external packages we should be able to recognize our own
- @Throws declaration.  The questions is do we trust these or should we still
+ - [x] when parsing external packages we should be able to recognize our own
+ @Throwing declaration.  The questions is do we trust these or should we still
  do our own inspections?
 
  - [x] document the use of 'peek definition' in vs-code to see the annotations.
@@ -109,11 +109,111 @@ class MyYaml {
   placed in the part library. Currently we place them in the 'part of' library
   which is causing errors.
 
+
+- [x] do recreate the indexes if they already exist unless the user passes
+the --recreate flag.
+
+- [x] check the flutter sdk indexes are being built
+
+- [x] create test to ensure that we are indexing exceptions in the
+flutter sdk that are at least second level call and that we are
+annotating code that uses one of those calls.
+
+- [x] I want to add in a command line switch (and analysis_options config)
+to switch between using the @Throwing annotation and using a doc comment.
+When we use a doc comment we still want to add the same @Throw
+syntax as we want the ability to parse a structure throws statement in
+a comment.  As such we need to ensure that we are actually parsing
+the @throws (unless the dart ast does it for us) statement so that
+some variations in formatting are tolerated i.e. split across multiple lines.
+I want the doc code method to be the default with a switch to use the annotation.
+
+- [x] create a separate annotations package that can be added as a dependency
+when a user uses the @Throwing annotation to avoid having to depend (for production)
+on the full document_throws package with its transient dependency.
+
+- [x] document how a package maintianer can use this package to add throws
+statements (in doc comments) as part of their release pipeline without
+depending on our package.
+
+- [x] I ran fix with --origin and the fix without origin. 
+The second run just added an additional throws without removing the orgin versions:
+
+- [x] rename the throws_annotation package to document_throws_annotation.
+```
+/// 
+/// @Throwing(ArgumentError, call: 'args|addFlag', origin: 'args|_addOption')
+/// @Throwing(ArgumentError, call: 'args|addOption', origin: 'args|_addOption')
+/// @Throwing(
+///   ArgumentError,
+///   call: 'args|addMultiOption',
+///   origin: 'args|_addOption',
+/// )
+/// @Throwing(ArgumentError)
+```
+
+Add tests for this.
+
+
+- [x] The Throws annotation conflicts with the test packages 'Throws' class.   It would be good to find a name
+that is still indicative of what the annotation does
+but which doesn't conflict with the test package.
+Rename the annotation to @Throwing
+
+- [x] create a detail set of unit tests for parsing the doc comments for @Throwing
+including dealing with providing good errors via lint output.
+
+- [] If a method/fuction/... doc comment mentions an Exception
+then don't add a doc comment for that exception as we will assume 
+the exception is already throw. This should also suppress the lint
+but if the exception is mentioned in the doc comments and the exception is
+not throw then warn with a lint.
+
+- [] Create a section need the end of the readme that discussion why we
+chose doccomments over annotations and why we chose Throwing over Throws
+plus any other key decisions that affect the user experience.
+
+- [] ensure that we are indexing transient dependencies and the
+correct version of those dependencies. 
+We probably need to be reading the pubspec.lock file in order to do this.
+
+- [] I'm concerned about the indexing of the flutter sdk. I'm seeing
+a lot of unknowns. I'm concerned that this means we aren't finding the
+index when the lint is running.  Given the number of index
+files do we need an index for the index?
+Indexing Flutter SDK unknown
+Indexing Flutter package flutter_goldens unknown (1/9)
+Skipping Flutter package flutter_goldens unknown (index exists).
+Indexing Flutter package flutter unknown (2/9)
+Skipping Flutter package flutter unknown (index exists).
+Indexing Flutter package flutter_test unknown (3/9)
+Skipping Flutter package flutter_test unknown (index exists).
+Indexing Flutter package flutter_tools unknown (4/9)
+Skipping Flutter package flutter_tools unknown (index exists).
+Indexing Flutter package integration_test unknown (5/9)
+Skipping Flutter package integration_test unknown (index exists).
+Indexing Flutter package fuchsia_remote_debug_protocol unknown (6/9)
+Skipping Flutter package fuchsia_remote_debug_protocol unknown (index exists).
+Indexing Flutter package flutter_localizations unknown (7/9)
+Skipping Flutter package flutter_localizations unknown (index exists).
+Indexing Flutter package flutter_web_plugins unknown (8/9)
+Skipping Flutter package flutter_web_plugins unknown (index exists).
+Indexing Flutter package flutter_driver unknown (9/9)
+Skipping Flutter package flutter_driver unknown (index exists).
+
+- [] the indexer appears to output two messages when skipping an index
+Indexing Flutter package flutter_driver unknown (9/9)
+Skipping Flutter package flutter_driver unknown (index exists).
+
+Instead it should only output the skipping message.
+
+- [] the indexer should provide a summary - n packages indexed, m packages skipped. 
+
+- [] in case the user switches between doc comments and annotations
+then we should remove the other type, where it is safe to do so.
+
+
+
 - [] optimise the code and improve the code structure.
 
 - [] run a performance analysis looking for improvments.
-
-- [] do recreate the indexes if they already exist unless the user passes
-the --recreate flag.
-
-- [] check the flutter sdk indexes are being built

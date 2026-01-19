@@ -1,7 +1,5 @@
 // ignore_for_file: dead_code
 
-import 'package:throws_annotations/throws_annotations.dart';
-
 class BadStateException implements Exception {}
 class BadState implements Exception {}
 class InvalidArg implements Exception {}
@@ -10,7 +8,7 @@ class MissingFile implements Exception {}
 class MissingFileException implements Exception {}
 
 class Sample {
-  @Throws(BadStateException)
+  /// @Throwing(BadStateException)
   void documentedMethod() {
     throw BadStateException();
   }
@@ -27,48 +25,48 @@ class Sample {
     RegExp('[');
   }
 
-  @Throws(MissingFileException)
+  /// @Throwing(MissingFileException)
   void documentedMultiLineThrows() {
     throw MissingFileException();
   }
 
-  @Throws(BadStateException)
+  /// @Throwing(BadStateException)
   void documentedThrowsWithArticle() {
     throw BadStateException();
   }
 
-  @Throws(MissingFileException)
+  /// @Throwing(MissingFileException)
   void documentedThrowsMidSentence() {
     throw MissingFileException();
   }
 
-  @Throws(MissingFileException, reason: 'Missing input')
+  /// @Throwing(MissingFileException, reason: 'Missing input')
   void documentedThrowsWithReason() {
     throw MissingFileException();
   }
 
-  @Throws(BadStateException)
+  /// @Throwing(BadStateException)
   void annotatedMissingException() {
     throw BadStateException();
     throw MissingFileException();
   }
 
-  @Throws(BadStateException, reason: 'bad')
+  /// @Throwing(BadStateException, reason: 'bad')
   void annotatedMissingExceptionWithSpec() {
     throw BadStateException();
     throw MissingFileException();
   }
 
-  @Throws(MissingFileException)
-  @Throws(BadStateException)
-  @Throws(InvalidArgException)
+  /// @Throwing(MissingFileException)
+  /// @Throwing(BadStateException)
+  /// @Throwing(InvalidArgException)
   void documentedThrowsList() {
     throw MissingFileException();
   }
 
-  @Throws(MissingFile)
-  @Throws(BadState)
-  @Throws(InvalidArg)
+  /// @Throwing(MissingFile)
+  /// @Throwing(BadState)
+  /// @Throwing(InvalidArg)
   void documentedThrowsListWithSpaces() {
     if (true) {
       throw MissingFile();
@@ -125,7 +123,7 @@ class Sample {
     }
   }
 
-  @Throws(BadStateException)
+  /// @Throwing(BadStateException)
   void documentedThrowsNoBody() {}
 
   void callerUsesDocThrows() {
@@ -144,7 +142,7 @@ class Sample {
     }
   }
 
-  @Throws(BadStateException)
+  /// @Throwing(BadStateException)
   Sample.named() {
     throw BadStateException();
   }
@@ -154,7 +152,7 @@ class Sample {
   }
 }
 
-@Throws(BadStateException)
+/// @Throwing(BadStateException)
 void documentedTopLevel() {
   throw BadStateException();
 }

@@ -9,29 +9,37 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/source/line_info.dart';
 
+import 'documentation_style.dart';
 import 'throws_cache.dart';
 import 'throws_cache_lookup.dart';
+import 'throwing_annotation.dart';
+import 'throwing_doc_parser.dart';
 
-class DocumentThrownExceptions extends AnalysisRule {
+class DocumentThrownExceptions extends MultiAnalysisRule {
   static const LintCode code = LintCode(
     'document_thrown_exceptions',
-    'Document thrown exception types with @Throws. Missing: {0}.',
+    'Document thrown exception types with @Throwing. Missing: {0}.',
     correctionMessage:
-        'Add @Throws(ExceptionType) for each thrown exception class.',
+        'Add @Throwing(ExceptionType) in docs or annotations for each thrown '
+        'exception class.',
+  );
+  static const LintCode malformedDocCode = LintCode(
+    'document_thrown_exceptions_malformed_doc',
+    'Malformed @Throwing doc comment: {0}',
+    correctionMessage: 'Use @Throwing(ExceptionType, ...) in doc comments.',
   );
 
   // Configure the lint rule metadata.
   DocumentThrownExceptions()
     : super(
         name: code.name,
-        description:
-            'Require @Throws annotations for each exception class thrown by a '
-            'method.',
+      description:
+            'Require @Throwing documentation for each exception class thrown '
+            'by a method.',
       );
 
   @override
-  // Expose lint code for registration and fixes.
-  LintCode get diagnosticCode => code;
+  List<DiagnosticCode> get diagnosticCodes => [code, malformedDocCode];
 
   @override
   // Register visitors that inspect executable members.
@@ -48,15 +56,17 @@ class DocumentThrownExceptions extends AnalysisRule {
 }
 
 class _Visitor extends SimpleAstVisitor<void> {
-  final AnalysisRule rule;
+  final DocumentThrownExceptions rule;
   final RuleContext context;
   final Map<String, CompilationUnit> unitsByPath;
   final ThrowsCacheLookup? externalLookup;
+  final DocumentationStyle documentationStyle;
 
   // Hold the rule to report diagnostics.
   _Visitor(this.rule, this.context)
     : unitsByPath = _unitsByPathFromContext(context),
-      externalLookup = _throwsCacheLookupFromContext(context);
+      externalLookup = _throwsCacheLookupFromContext(context),
+      documentationStyle = documentationStyleForContext(context);
 
   @override
   // Inspect method bodies for undocumented throw types.
@@ -64,6 +74,7 @@ class _Visitor extends SimpleAstVisitor<void> {
     _checkExecutable(
       body: node.body,
       metadata: node.metadata,
+      documentationComment: node.documentationComment,
       reportToken: node.name,
     );
   }
@@ -74,6 +85,7 @@ class _Visitor extends SimpleAstVisitor<void> {
     _checkExecutable(
       body: node.body,
       metadata: node.metadata,
+      documentationComment: node.documentationComment,
       reportToken: node.returnType.beginToken,
     );
   }
@@ -85,6 +97,7 @@ class _Visitor extends SimpleAstVisitor<void> {
     _checkExecutable(
       body: node.functionExpression.body,
       metadata: node.metadata,
+      documentationComment: node.documentationComment,
       reportToken: node.name,
     );
   }
@@ -92,15 +105,30 @@ class _Visitor extends SimpleAstVisitor<void> {
   void _checkExecutable({
     required FunctionBody body,
     required NodeList<Annotation>? metadata,
+    required Comment? documentationComment,
     required Token reportToken,
   }) {
     // Fast exit when no throw token appears in the body.
     if (body is EmptyFunctionBody) return;
 
+    if (documentationStyle == DocumentationStyle.docComment &&
+        documentationComment != null) {
+      final parsed = parseThrowingDocComment(documentationComment);
+      for (final error in parsed.errors) {
+        rule.reportAtToken(
+          reportToken,
+          diagnosticCode: DocumentThrownExceptions.malformedDocCode,
+          arguments: [error.message],
+        );
+      }
+    }
+
     // Report when any thrown types are missing from docs.
     final missing = missingThrownTypeDocs(
       body,
       metadata,
+      documentationComment: documentationComment,
+      documentationStyle: documentationStyle,
       unitsByPath: unitsByPath,
       externalLookup: externalLookup,
     );
@@ -108,7 +136,11 @@ class _Visitor extends SimpleAstVisitor<void> {
 
     final missingList = missing.toList()..sort();
     final missingLabel = missingList.join(', ');
-    rule.reportAtToken(reportToken, arguments: [missingLabel]);
+    rule.reportAtToken(
+      reportToken,
+      diagnosticCode: DocumentThrownExceptions.code,
+      arguments: [missingLabel],
+    );
   }
 }
 
@@ -157,6 +189,8 @@ class _ThrownTypeResults {
 Set<String> missingThrownTypeDocs(
   FunctionBody body,
   NodeList<Annotation>? metadata, {
+  Comment? documentationComment,
+  DocumentationStyle documentationStyle = DocumentationStyle.docComment,
   bool allowSourceFallback = false,
   Map<String, CompilationUnit>? unitsByPath,
   ThrowsCacheLookup? externalLookup,
@@ -164,6 +198,8 @@ Set<String> missingThrownTypeDocs(
   final missing = missingThrownTypeInfos(
     body,
     metadata,
+    documentationComment: documentationComment,
+    documentationStyle: documentationStyle,
     allowSourceFallback: allowSourceFallback,
     unitsByPath: unitsByPath,
     externalLookup: externalLookup,
@@ -174,6 +210,8 @@ Set<String> missingThrownTypeDocs(
 List<ThrownTypeInfo> missingThrownTypeInfos(
   FunctionBody body,
   NodeList<Annotation>? metadata, {
+  Comment? documentationComment,
+  DocumentationStyle documentationStyle = DocumentationStyle.docComment,
   bool allowSourceFallback = false,
   Map<String, CompilationUnit>? unitsByPath,
   ThrowsCacheLookup? externalLookup,
@@ -195,7 +233,9 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
   }
   if (thrownTypes.isEmpty) return const <ThrownTypeInfo>[];
 
-  final documented = _annotationThrownTypes(metadata);
+  final documented = documentationStyle == DocumentationStyle.annotation
+      ? _annotationThrownTypes(metadata)
+      : _docCommentThrownTypes(documentationComment);
   final byName = <String, ThrownTypeInfo>{};
   for (final info in thrownResults.infos) {
     final existing = byName[info.name];
@@ -271,12 +311,25 @@ Set<String> _annotationThrownTypes(NodeList<Annotation>? metadata) {
   if (metadata == null || metadata.isEmpty) return const <String>{};
   final types = <String>{};
   for (final annotation in metadata) {
-    if (_annotationName(annotation) != 'Throws') continue;
+    if (_annotationName(annotation) != throwingAnnotationName) continue;
     final args = annotation.arguments?.arguments;
     if (args == null || args.isEmpty) continue;
     final first = args.first;
     if (first is ListLiteral) continue;
     final normalized = _extractThrowTypeName(first);
+    if (normalized != null) {
+      types.add(normalized);
+    }
+  }
+  return types;
+}
+
+Set<String> _docCommentThrownTypes(Comment? comment) {
+  final parsed = parseThrowingDocComment(comment);
+  if (parsed.typeNames.isEmpty) return const <String>{};
+  final types = <String>{};
+  for (final rawType in parsed.typeNames) {
+    final normalized = _normalizeTypeName(rawType);
     if (normalized != null) {
       types.add(normalized);
     }
@@ -739,7 +792,7 @@ ThrowsCacheLookup? _throwsCacheLookupFromContext(RuleContext context) {
   return ThrowsCacheLookup.forProjectRoot(root);
 }
 
-// Doc-based discovery is intentionally disabled in favor of @Throws.
+// Doc-based discovery is enabled by default for @Throwing tags.
 
 bool _isCatchAllName(String catchName, String thrownName) {
   if (catchName == 'Object' || catchName == 'dynamic') return true;

@@ -33,11 +33,11 @@ void main() {
       edits,
     );
 
-    expect(updated, contains('@Throws(\n'));
-    expect(updated, contains('  FormatException,\n'));
-    expect(updated, contains("  call: 'dart:core|RegExp.new',\n"));
-    expect(updated, contains("  origin: 'dart:core|RegExp',\n"));
-    expect(updated, contains(')\n'));
+    expect(updated, contains('/// @Throwing(\n'));
+    expect(updated, contains('///   FormatException,\n'));
+    expect(updated, contains("///   call: 'dart:core|RegExp.new',\n"));
+    expect(updated, contains("///   origin: 'dart:core|RegExp',\n"));
+    expect(updated, contains('/// )\n'));
   });
 
   test('fix --origin preserves reason without provenance', () async {
@@ -59,7 +59,8 @@ void main() {
       resolved.unit.content,
       edits,
     );
-    final reasonPattern = "@Throws\\(BadStateException, reason: 'bad'\\)";
+    final reasonPattern =
+        "/// @Throwing\\(BadStateException, reason: 'bad'\\)";
     expect(RegExp(reasonPattern).allMatches(updated).length, 1);
   });
 
@@ -108,16 +109,16 @@ void main() {
       edits,
     );
 
-    expect(updated, contains('@Throws(\n'));
-    expect(updated, contains('  FormatException,\n'));
-    expect(updated, contains("  call: 'dart:core|RegExp.new',\n"));
+    expect(updated, contains('/// @Throwing(\n'));
+    expect(updated, contains('///   FormatException,\n'));
+    expect(updated, contains("///   call: 'dart:core|RegExp.new',\n"));
     expect(
       updated,
       contains(
-        "  origin: 'very_long_package_name|veryLongOriginMethodName',\n",
+        "///   origin: 'very_long_package_name|veryLongOriginMethodName',\n",
       ),
     );
-    expect(updated, contains(')\n'));
+    expect(updated, contains('/// )\n'));
   });
 
   test('fix without --origin strips provenance from annotations', () async {
@@ -141,7 +142,7 @@ void main() {
       edits,
     );
 
-    expect(updated, contains('@Throws(FormatException)\n'));
+    expect(updated, contains('/// @Throwing(FormatException)\n'));
     expect(updated, isNot(contains('call:')));
     expect(updated, isNot(contains('origin:')));
   });
@@ -180,28 +181,18 @@ void main() {
       unitResult.content,
       partEdits,
     );
-    expect(partUpdated, contains('@Throws(BadStateException)'));
+    expect(partUpdated, contains('/// @Throwing(BadStateException)'));
     expect(
       partUpdated,
-      isNot(contains('package:throws_annotations/throws_annotations.dart')),
+      isNot(contains('package:document_throws_annotation/document_throws_annotation.dart')),
     );
 
     final libraryEdits = editsByFile[File(libraryPath).absolute.path];
-    expect(libraryEdits, isNotNull);
-    libraryEdits!.sort((a, b) => b.offset.compareTo(a.offset));
-    final libraryContent = File(libraryPath).readAsStringSync();
-    final libraryUpdated = SourceEdit.applySequence(
-      libraryContent,
-      libraryEdits,
-    );
-    expect(
-      libraryUpdated,
-      contains("import 'package:throws_annotations/throws_annotations.dart';"),
-    );
+    expect(libraryEdits, isNull);
     await collection.dispose();
   });
 
-  test('fix output with provenance compiles with Throws annotation', () async {
+  test('fix output with provenance compiles with doc comments', () async {
     final fixturePath =
         'test/fixtures/document_thrown_exceptions_provenance.dart';
     final resolved = await resolveFixture(File(fixturePath).absolute.path);
@@ -227,9 +218,7 @@ void main() {
     );
     try {
       final file = File('${tempDir.path}/sample.dart');
-      await file.writeAsString(
-        "import 'package:throws_annotations/throws_annotations.dart';\n\n$updated",
-      );
+      await file.writeAsString(updated);
 
       final collection = AnalysisContextCollection(
         includedPaths: [file.path],

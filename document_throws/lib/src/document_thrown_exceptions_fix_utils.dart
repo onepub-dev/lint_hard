@@ -9,14 +9,18 @@ import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:path/path.dart' as p;
 
 import 'document_thrown_exceptions.dart';
+import 'documentation_style.dart';
 import 'throws_cache.dart';
 import 'throws_cache_lookup.dart';
+import 'throwing_annotation.dart';
 
 Map<String, List<SourceEdit>> documentThrownExceptionEdits(
   ResolvedUnitResult unitResult,
   Iterable<ResolvedUnitResult> libraryUnits, {
   ThrowsCacheLookup? externalLookup,
   bool includeSource = false,
+  DocumentationStyle documentationStyle = DocumentationStyle.docComment,
+  ExecutableTarget? onlyTarget,
 }) {
   final unitsByPath = unitsByPathFromResolvedUnits(libraryUnits);
   final collector = _ExecutableCollector();
@@ -26,9 +30,17 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
   final editsByPath = <String, List<SourceEdit>>{};
   final importTarget = _importTargetUnit(unitResult, libraryUnits);
   var hasImport = _hasThrowsImport(importTarget.unit);
-  for (final target in collector.targets) {
+  final targets = onlyTarget == null
+      ? collector.targets
+      : collector.targets.where(
+          (target) => target.declarationOffset == onlyTarget.declarationOffset,
+        );
+  for (final target in targets) {
     final needsProvenanceCleanup =
-        !includeSource && _hasProvenanceAnnotations(target.metadata);
+        !includeSource &&
+        (documentationStyle == DocumentationStyle.annotation
+            ? _hasProvenanceAnnotations(target.metadata)
+            : _hasProvenanceDocTags(target.documentationComment));
     final thrownInfos = includeSource || needsProvenanceCleanup
         ? _mergeThrownInfos(
             collectThrownTypeInfos(
@@ -40,50 +52,101 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
         : missingThrownTypeInfos(
             target.body,
             target.metadata,
+            documentationComment: target.documentationComment,
+            documentationStyle: documentationStyle,
             unitsByPath: unitsByPath,
             externalLookup: externalLookup,
           );
     if (thrownInfos.isEmpty) continue;
 
-    final insertOffset = _annotationInsertOffset(content, target);
+    final commentStyle = documentationStyle == DocumentationStyle.docComment
+        ? _docCommentStyle(target.documentationComment)
+        : _DocCommentStyle.none;
+    final insertOffset = documentationStyle == DocumentationStyle.annotation
+        ? _annotationInsertOffset(content, target)
+        : _docCommentInsertOffset(content, target, commentStyle);
     final indent = indentAtOffset(content, target.declarationOffset);
     final libraryUri = unitResult.libraryFragment.source.uri.toString();
     final importData = _collectImportPrefixes(importTarget.unit);
     final sortedMissing = thrownInfos.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
     final reasonByType = includeSource || needsProvenanceCleanup
-        ? _annotationReasonByType(target.metadata)
+        ? documentationStyle == DocumentationStyle.annotation
+            ? _annotationReasonByType(target.metadata)
+            : _docCommentReasonByType(target.documentationComment)
         : const <String, String>{};
-    if (includeSource || needsProvenanceCleanup) {
-      _addEdits(
+    final lines = <String>[];
+    final rawDocLines = <String>[];
+    final maxLineLength = documentationStyle == DocumentationStyle.docComment
+        ? (commentStyle == _DocCommentStyle.block ? 78 : 76)
+        : 80;
+    for (final info in sortedMissing) {
+      final rendered = _formatThrownAnnotations(
+        info,
+        importData,
+        libraryUri,
+        includeSource: includeSource,
+        reasonSource: reasonByType[info.name],
+        unit: importTarget.unit,
+        maxLineLength: maxLineLength,
+      );
+      rawDocLines.addAll(rendered);
+      final displayLines = documentationStyle == DocumentationStyle.docComment
+          ? _prefixDocCommentLines(rendered, commentStyle)
+          : rendered;
+      lines.addAll(displayLines);
+    }
+    final replaceDocComment = documentationStyle ==
+            DocumentationStyle.docComment &&
+        target.documentationComment != null &&
+        (includeSource || needsProvenanceCleanup);
+    if (replaceDocComment) {
+      final updated = _replaceDocThrowingTags(
+        content,
+        target.documentationComment!,
+        rawDocLines,
+        indent,
+        commentStyle,
+      );
+      _addEdit(
         editsByPath,
         unitResult.path,
-        _removeThrowsAnnotations(
-          content,
-          target.metadata,
-          sortedMissing.map((info) => info.name).toSet(),
+        SourceEdit(
+          target.documentationComment!.offset,
+          target.documentationComment!.end -
+              target.documentationComment!.offset,
+          updated,
         ),
       );
-    }
-    final lines = <String>[];
-    for (final info in sortedMissing) {
-      lines.addAll(
-        _formatThrownAnnotations(
-          info,
-          importData,
-          libraryUri,
-          includeSource: includeSource,
-          reasonSource: reasonByType[info.name],
-          unit: importTarget.unit,
-        ),
+    } else {
+      if (includeSource || needsProvenanceCleanup) {
+        final removeEdits = documentationStyle == DocumentationStyle.annotation
+            ? _removeThrowsAnnotations(
+                content,
+                target.metadata,
+                sortedMissing.map((info) => info.name).toSet(),
+              )
+            : _removeDocThrowingTags(
+                content,
+                target.documentationComment,
+              );
+        _addEdits(editsByPath, unitResult.path, removeEdits);
+      }
+      final insertionText = _renderInsertionText(
+        indent,
+        lines,
+        documentationStyle,
+        commentStyle,
       );
+      if (insertionText != null) {
+        _addEdit(
+          editsByPath,
+          unitResult.path,
+          SourceEdit(insertOffset, 0, insertionText),
+        );
+      }
     }
-    _addEdit(
-      editsByPath,
-      unitResult.path,
-      SourceEdit(insertOffset, 0, '$indent${lines.join("\n$indent")}\n'),
-    );
-    if (!hasImport) {
+    if (documentationStyle == DocumentationStyle.annotation && !hasImport) {
       final insertion = _importInsertion(
         importTarget.unit,
         importTarget.content,
@@ -228,7 +291,7 @@ bool _hasThrowsImport(CompilationUnit unit) {
   for (final directive in unit.directives) {
     if (directive is ImportDirective &&
         directive.uri.stringValue ==
-            'package:throws_annotations/throws_annotations.dart') {
+            'package:document_throws_annotation/document_throws_annotation.dart') {
       return true;
     }
   }
@@ -238,7 +301,7 @@ bool _hasThrowsImport(CompilationUnit unit) {
 bool _hasProvenanceAnnotations(NodeList<Annotation>? metadata) {
   if (metadata == null || metadata.isEmpty) return false;
   for (final annotation in metadata) {
-    if (_annotationName(annotation) != 'Throws') continue;
+    if (_annotationName(annotation) != throwingAnnotationName) continue;
     if (_annotationHasProvenance(annotation)) return true;
   }
   return false;
@@ -271,7 +334,8 @@ int _importGroupForUri(String uri) {
 }
 
 _ImportInsertion _importInsertion(CompilationUnit unit, String content) {
-  const newUri = 'package:throws_annotations/throws_annotations.dart';
+  const newUri =
+      'package:document_throws_annotation/document_throws_annotation.dart';
   final newGroup = _importGroupForUri(newUri);
   final imports = <_ImportInfo>[];
   for (final directive in unit.directives) {
@@ -350,6 +414,29 @@ int _annotationInsertOffset(String content, ExecutableTarget target) {
   return _lineOffsetAfter(content, comment.end);
 }
 
+enum _DocCommentStyle { none, line, block }
+
+_DocCommentStyle _docCommentStyle(Comment? comment) {
+  if (comment == null) return _DocCommentStyle.none;
+  final source = comment.toSource();
+  if (source.startsWith('///')) return _DocCommentStyle.line;
+  if (source.startsWith('/**')) return _DocCommentStyle.block;
+  return _DocCommentStyle.line;
+}
+
+int _docCommentInsertOffset(
+  String content,
+  ExecutableTarget target,
+  _DocCommentStyle style,
+) {
+  final comment = target.documentationComment;
+  if (comment == null) return lineStart(content, target.declarationOffset);
+  if (style == _DocCommentStyle.block) {
+    return comment.end - 2;
+  }
+  return _lineOffsetAfter(content, comment.end);
+}
+
 List<SourceEdit> _removeThrowsAnnotations(
   String content,
   NodeList<Annotation>? metadata,
@@ -358,7 +445,7 @@ List<SourceEdit> _removeThrowsAnnotations(
   if (metadata == null || metadata.isEmpty) return const <SourceEdit>[];
   final edits = <SourceEdit>[];
   for (final annotation in metadata) {
-    if (_annotationName(annotation) != 'Throws') continue;
+    if (_annotationName(annotation) != throwingAnnotationName) continue;
     final typeName = _annotationTypeName(annotation);
     if (typeName == null || !replaceNames.contains(typeName)) continue;
     final start = lineStart(content, annotation.offset);
@@ -410,7 +497,7 @@ Map<String, String> _annotationReasonByType(
   if (metadata == null || metadata.isEmpty) return const <String, String>{};
   final map = <String, String>{};
   for (final annotation in metadata) {
-    if (_annotationName(annotation) != 'Throws') continue;
+    if (_annotationName(annotation) != throwingAnnotationName) continue;
     final name = _annotationTypeName(annotation);
     if (name == null) continue;
     final args = annotation.arguments?.arguments;
@@ -471,7 +558,7 @@ String _importText(
       nextOffset != null &&
       _lineBreakCount(content, insertAt, nextOffset) < 2;
   final suffix = needsGroupSpacing ? '\n' : '';
-  return "${prefix}import 'package:throws_annotations/throws_annotations.dart';\n$suffix";
+  return "${prefix}import 'package:document_throws_annotation/document_throws_annotation.dart';\n$suffix";
 }
 
 bool _isLineBreak(int codeUnit) => codeUnit == 0x0A || codeUnit == 0x0D;
@@ -563,6 +650,7 @@ List<String> _formatThrownAnnotations(
   required bool includeSource,
   String? reasonSource,
   required CompilationUnit unit,
+  required int maxLineLength,
 }) {
   final renderedType = _formatThrownType(
     info,
@@ -575,7 +663,7 @@ List<String> _formatThrownAnnotations(
     if (reasonSource != null) {
       args.add('reason: $reasonSource');
     }
-    return _renderThrowsAnnotation(args);
+    return _renderThrowingInvocation(args, maxLineLength: maxLineLength);
   }
   final lines = <String>[];
   for (final provenance in info.provenance) {
@@ -586,7 +674,7 @@ List<String> _formatThrownAnnotations(
       if (provenance.origin != null)
         "origin: '${_escapeSourceString(_shortenSource(provenance.origin!))}'",
     ];
-    lines.addAll(_renderThrowsAnnotation(args));
+    lines.addAll(_renderThrowingInvocation(args, maxLineLength: maxLineLength));
   }
   return lines;
 }
@@ -658,15 +746,317 @@ String _escapeSourceString(String value) {
   return value.replaceAll('\\', r'\\').replaceAll("'", r"\'");
 }
 
-List<String> _renderThrowsAnnotation(List<String> args) {
-  final singleLine = '@Throws(${args.join(', ')})';
-  if (singleLine.length <= 80) return [singleLine];
-  final lines = <String>['@Throws('];
+List<String> _renderThrowingInvocation(
+  List<String> args, {
+  required int maxLineLength,
+}) {
+  final singleLine = '@$throwingAnnotationName(${args.join(', ')})';
+  if (singleLine.length <= maxLineLength) return [singleLine];
+  final lines = <String>['@$throwingAnnotationName('];
   for (final arg in args) {
     lines.add('  $arg,');
   }
   lines.add(')');
   return lines;
+}
+
+List<String> _prefixDocCommentLines(
+  List<String> lines,
+  _DocCommentStyle style,
+) {
+  final prefix = style == _DocCommentStyle.block ? '* ' : '/// ';
+  return [for (final line in lines) '$prefix$line'];
+}
+
+String? _renderInsertionText(
+  String indent,
+  List<String> lines,
+  DocumentationStyle documentationStyle,
+  _DocCommentStyle commentStyle,
+) {
+  if (lines.isEmpty) return null;
+  final body = lines.join('\n$indent');
+  if (documentationStyle == DocumentationStyle.docComment &&
+      commentStyle == _DocCommentStyle.block) {
+    return '\n$indent$body';
+  }
+  return '$indent$body\n';
+}
+
+bool _hasProvenanceDocTags(Comment? comment) {
+  return _parseDocThrowingTags(comment)
+      .any((tag) => tag.hasProvenance);
+}
+
+Map<String, String> _docCommentReasonByType(Comment? comment) {
+  final tags = _parseDocThrowingTags(comment);
+  final result = <String, String>{};
+  for (final tag in tags) {
+    final reason = tag.reason;
+    if (reason == null || reason.isEmpty) continue;
+    result[tag.type] = reason;
+  }
+  return result;
+}
+
+List<SourceEdit> _removeDocThrowingTags(
+  String content,
+  Comment? comment,
+) {
+  if (comment == null) return const <SourceEdit>[];
+  final source = content.substring(comment.offset, comment.end);
+  final lines = source.split(RegExp(r'\r?\n'));
+  final filtered = [
+    for (final line in lines)
+      if (!line.contains(throwingDocTag)) line,
+  ];
+  if (filtered.length == lines.length) return const <SourceEdit>[];
+  final replacement = filtered.join('\n');
+  return [
+    SourceEdit(comment.offset, comment.end - comment.offset, replacement),
+  ];
+}
+
+String _replaceDocThrowingTags(
+  String content,
+  Comment comment,
+  List<String> newLines,
+  String indent,
+  _DocCommentStyle style,
+) {
+  final existingLines = _docCommentLines(comment);
+  final kept = [
+    for (final line in existingLines)
+      if (!line.trimLeft().startsWith(throwingDocTag)) line,
+  ];
+  final merged = [...kept, ...newLines];
+  return _buildDocComment(merged, indent, style);
+}
+
+List<String> _docCommentLines(Comment comment) {
+  final source = comment.tokens.map((token) => token.lexeme).join('\n');
+  final trimmedLeft = source.trimLeft();
+  if (trimmedLeft.startsWith('///')) {
+    final lines = source.split(RegExp(r'\r?\n'));
+    return [
+      for (final line in lines)
+        _stripDocLinePrefix(line, '///'),
+    ];
+  }
+  if (trimmedLeft.startsWith('/**')) {
+    final trimmed = source
+        .replaceFirst('/**', '')
+        .replaceFirst('*/', '')
+        .trim();
+    final lines = trimmed.split(RegExp(r'\r?\n'));
+    return [for (final line in lines) _stripBlockDocLine(line)];
+  }
+  return [source.trim()];
+}
+
+String _buildDocComment(
+  List<String> lines,
+  String indent,
+  _DocCommentStyle style,
+) {
+  if (style == _DocCommentStyle.block) {
+    final body = lines.map((line) => '$indent * $line').join('\n');
+    return '$indent/**\n$body\n$indent */';
+  }
+  final body = lines.map((line) => '$indent/// $line').join('\n');
+  return '$body\n';
+}
+
+String _stripDocLinePrefix(String line, String prefix) {
+  final index = line.indexOf(prefix);
+  if (index == -1) return line.trim();
+  return line.substring(index + prefix.length).trimLeft();
+}
+
+String _stripBlockDocLine(String line) {
+  final trimmed = line.trimLeft();
+  if (trimmed.startsWith('*')) {
+    return trimmed.substring(1).trimLeft();
+  }
+  return trimmed.trimRight();
+}
+
+class _DocThrowingTag {
+  final String type;
+  final String? reason;
+  final bool hasProvenance;
+
+  const _DocThrowingTag(
+    this.type, {
+    this.reason,
+    required this.hasProvenance,
+  });
+}
+
+List<_DocThrowingTag> _parseDocThrowingTags(Comment? comment) {
+  if (comment == null) return const <_DocThrowingTag>[];
+  final text = _docCommentLines(comment).join('\n');
+  return _extractDocThrowingTags(text);
+}
+
+List<_DocThrowingTag> _extractDocThrowingTags(String text) {
+  final tags = <_DocThrowingTag>[];
+  var index = 0;
+  while (true) {
+    final tagIndex = text.indexOf(throwingDocTag, index);
+    if (tagIndex == -1) break;
+    final openIndex = text.indexOf('(', tagIndex + throwingDocTag.length);
+    if (openIndex == -1) break;
+    final closeIndex = _findMatchingParen(text, openIndex);
+    if (closeIndex == -1) break;
+    final args = text.substring(openIndex + 1, closeIndex);
+    final parts = _splitDocArgs(args);
+    if (parts.isEmpty) {
+      index = closeIndex + 1;
+      continue;
+    }
+    var typeName = parts.first.trim();
+    if (typeName.startsWith('const ')) {
+      typeName = typeName.substring(6).trimLeft();
+    }
+    final normalized = _normalizeTypeName(typeName);
+    if (normalized != null) {
+      final reason = _namedDocArg(parts, 'reason');
+      final hasProv =
+          _namedDocArg(parts, 'call') != null ||
+          _namedDocArg(parts, 'origin') != null;
+      tags.add(
+        _DocThrowingTag(
+          normalized,
+          reason: reason,
+          hasProvenance: hasProv,
+        ),
+      );
+    }
+    index = closeIndex + 1;
+  }
+  return tags;
+}
+
+List<String> _splitDocArgs(String args) {
+  final parts = <String>[];
+  var depthParen = 0;
+  var depthAngle = 0;
+  var inSingle = false;
+  var inDouble = false;
+  var escape = false;
+  var start = 0;
+  for (var i = 0; i < args.length; i++) {
+    final ch = args[i];
+    if (inSingle) {
+      if (escape) {
+        escape = false;
+      } else if (ch == '\\') {
+        escape = true;
+      } else if (ch == "'") {
+        inSingle = false;
+      }
+      continue;
+    }
+    if (inDouble) {
+      if (escape) {
+        escape = false;
+      } else if (ch == '\\') {
+        escape = true;
+      } else if (ch == '"') {
+        inDouble = false;
+      }
+      continue;
+    }
+    if (ch == "'") {
+      inSingle = true;
+      continue;
+    }
+    if (ch == '"') {
+      inDouble = true;
+      continue;
+    }
+    if (ch == '(') {
+      depthParen++;
+      continue;
+    }
+    if (ch == ')' && depthParen > 0) {
+      depthParen--;
+      continue;
+    }
+    if (ch == '<') {
+      depthAngle++;
+      continue;
+    }
+    if (ch == '>' && depthAngle > 0) {
+      depthAngle--;
+      continue;
+    }
+    if (ch == ',' && depthParen == 0 && depthAngle == 0) {
+      parts.add(args.substring(start, i).trim());
+      start = i + 1;
+    }
+  }
+  final tail = args.substring(start).trim();
+  if (tail.isNotEmpty) parts.add(tail);
+  return parts;
+}
+
+String? _namedDocArg(List<String> args, String name) {
+  final prefix = '$name:';
+  for (final part in args.skip(1)) {
+    final trimmed = part.trimLeft();
+    if (!trimmed.startsWith(prefix)) continue;
+    return trimmed.substring(prefix.length).trimLeft();
+  }
+  return null;
+}
+
+int _findMatchingParen(String text, int openIndex) {
+  var depth = 0;
+  var inSingle = false;
+  var inDouble = false;
+  var escape = false;
+  for (var i = openIndex + 1; i < text.length; i++) {
+    final ch = text[i];
+    if (inSingle) {
+      if (escape) {
+        escape = false;
+      } else if (ch == '\\') {
+        escape = true;
+      } else if (ch == "'") {
+        inSingle = false;
+      }
+      continue;
+    }
+    if (inDouble) {
+      if (escape) {
+        escape = false;
+      } else if (ch == '\\') {
+        escape = true;
+      } else if (ch == '"') {
+        inDouble = false;
+      }
+      continue;
+    }
+    if (ch == "'") {
+      inSingle = true;
+      continue;
+    }
+    if (ch == '"') {
+      inDouble = true;
+      continue;
+    }
+    if (ch == '(') {
+      depth++;
+      continue;
+    }
+    if (ch == ')') {
+      if (depth == 0) return i;
+      depth--;
+    }
+  }
+  return -1;
 }
 
 String _shortenSource(String source) {

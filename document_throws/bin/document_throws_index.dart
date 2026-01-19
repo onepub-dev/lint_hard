@@ -6,10 +6,10 @@ import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
-
 import 'package:document_throws/src/throws_cache.dart';
 import 'package:document_throws/src/throws_cache_indexer.dart';
 import 'package:document_throws/src/throws_cache_writer.dart';
+import 'package:document_throws/src/flutter_index.dart' as flutter_index;
 import 'package:document_throws/src/version/version.g.dart';
 
 Future<void> main(List<String> args) async {
@@ -24,6 +24,7 @@ Future<void> main(List<String> args) async {
   final includeSdk = !args.contains('--no-sdk');
   final includeFlutter = !args.contains('--no-flutter');
   final includePackages = !args.contains('--no-packages');
+  final recreate = args.contains('--recreate');
   final sdkPath = _sdkPath();
   void log(String message) {
     if (!quiet) stdout.writeln(message);
@@ -53,12 +54,6 @@ Future<void> main(List<String> args) async {
           'Indexing ${package.name} ${package.version} '
           '($indexed/${packages.length})',
         );
-        final entries = await _indexPackage(
-          packageRoot,
-          sdkPath,
-          packageName: package.name,
-          log: log,
-        );
         final outFile = File(
           p.join(
             outputRoot,
@@ -69,6 +64,16 @@ Future<void> main(List<String> args) async {
             package.sourceId,
             '${package.version}.throws',
           ),
+        );
+        if (!recreate && outFile.existsSync()) {
+          log('Skipping ${package.name} ${package.version} (index exists).');
+          continue;
+        }
+        final entries = await _indexPackage(
+          packageRoot,
+          sdkPath,
+          packageName: package.name,
+          log: log,
         );
         ThrowsCacheWriter.writeFileSync(outFile, entries);
         log(
@@ -88,43 +93,44 @@ Future<void> main(List<String> args) async {
       return;
     }
     log('Indexing SDK $sdkVersion');
-    final sdkEntries = await _indexSdk(sdkRoot, sdkPath, log: log);
     final outFile = File(
       p.join(outputRoot, 'throws', 'v1', 'sdk', '$sdkVersion.throws'),
     );
-    ThrowsCacheWriter.writeFileSync(outFile, sdkEntries);
-    log(
-      'Wrote ${sdkEntries.length} entries to ${outFile.path}',
-    );
+    if (!recreate && outFile.existsSync()) {
+      log('Skipping SDK $sdkVersion (index exists).');
+    } else {
+      final sdkEntries = await _indexSdk(sdkRoot, sdkPath, log: log);
+      ThrowsCacheWriter.writeFileSync(outFile, sdkEntries);
+      log(
+        'Wrote ${sdkEntries.length} entries to ${outFile.path}',
+      );
+    }
   }
 
   if (includeFlutter) {
     final sdkRoot = sdkPath ?? _sdkRootFromExecutable();
-    final flutterRoot = _flutterRoot(sdkRoot);
-    if (flutterRoot == null) {
+    final flutterRootPath = flutter_index.flutterRoot(sdkRoot);
+    if (flutterRootPath == null) {
       log('Unable to determine Flutter SDK path; skipping Flutter index.');
     } else {
-      final flutterVersion = _flutterVersion(flutterRoot);
-      log('Indexing Flutter SDK $flutterVersion');
-      final packages = _flutterPackages(flutterRoot, flutterVersion);
+      final flutterSdkVersion = flutter_index.flutterVersion(flutterRootPath);
+      log('Indexing Flutter SDK $flutterSdkVersion');
+      final packages = flutter_index.flutterPackages(
+        flutterRootPath,
+        flutterSdkVersion,
+      );
       if (packages.isEmpty) {
         log(
           '  No Flutter packages found under '
-          '${p.join(flutterRoot, 'packages')}',
+          '${p.join(flutterRootPath, 'packages')}',
         );
       } else {
         var indexed = 0;
         for (final package in packages) {
           indexed++;
-        log(
-          'Indexing Flutter package ${package.name} ${package.version} '
-          '($indexed/${packages.length})',
-        );
-          final entries = await _indexPackage(
-            package.path,
-            sdkPath,
-            packageName: package.name,
-            log: log,
+          log(
+            'Indexing Flutter package ${package.name} ${package.version} '
+            '($indexed/${packages.length})',
           );
           final outFile = File(
             p.join(
@@ -136,6 +142,19 @@ Future<void> main(List<String> args) async {
               'sdk',
               '${package.version}.throws',
             ),
+          );
+          if (!recreate && outFile.existsSync()) {
+            log(
+              'Skipping Flutter package ${package.name} ${package.version} '
+              '(index exists).',
+            );
+            continue;
+          }
+          final entries = await _indexPackage(
+            package.path,
+            sdkPath,
+            packageName: package.name,
+            log: log,
           );
           ThrowsCacheWriter.writeFileSync(outFile, entries);
           log(
@@ -272,65 +291,6 @@ String? _sdkRootFromExecutable() {
   return binDir.parent.path;
 }
 
-String? _flutterRoot(String? sdkRoot) {
-  final envRoot = Platform.environment['FLUTTER_ROOT'];
-  if (envRoot != null && envRoot.isNotEmpty) {
-    final dir = Directory(envRoot);
-    if (dir.existsSync()) return dir.path;
-  }
-
-  if (sdkRoot == null) return null;
-  final candidate = p.normalize(p.join(sdkRoot, '..', '..', '..'));
-  final packagesDir = Directory(p.join(candidate, 'packages'));
-  final flutterBin = File(p.join(candidate, 'bin', 'flutter'));
-  if (packagesDir.existsSync() && flutterBin.existsSync()) {
-    return candidate;
-  }
-  return null;
-}
-
-String _flutterVersion(String flutterRoot) {
-  final versionFile = File(p.join(flutterRoot, 'version'));
-  if (versionFile.existsSync()) {
-    final value = versionFile.readAsStringSync().trim();
-    if (value.isNotEmpty) return value;
-  }
-  return 'unknown';
-}
-
-List<_FlutterPackage> _flutterPackages(
-  String flutterRoot,
-  String flutterVersion,
-) {
-  final packagesDir = Directory(p.join(flutterRoot, 'packages'));
-  if (!packagesDir.existsSync()) return const <_FlutterPackage>[];
-  final results = <_FlutterPackage>[];
-  for (final entity in packagesDir.listSync(followLinks: false)) {
-    if (entity is! Directory) continue;
-    final pubspec = File(p.join(entity.path, 'pubspec.yaml'));
-    if (!pubspec.existsSync()) continue;
-    final info = _readFlutterPackage(pubspec, entity.path, flutterVersion);
-    if (info != null) results.add(info);
-  }
-  return results;
-}
-
-_FlutterPackage? _readFlutterPackage(
-  File pubspec,
-  String packagePath,
-  String flutterVersion,
-) {
-  final doc = loadYaml(pubspec.readAsStringSync());
-  if (doc is! YamlMap) return null;
-  final name = doc['name']?.toString();
-  if (name == null || name.isEmpty) return null;
-  return _FlutterPackage(
-    name: name,
-    path: packagePath,
-    version: flutterVersion,
-  );
-}
-
 String? _argValue(List<String> args, String name) {
   for (final arg in args) {
     if (arg.startsWith('$name=')) {
@@ -435,17 +395,6 @@ class _LockedPackage {
   }
 }
 
-class _FlutterPackage {
-  final String name;
-  final String path;
-  final String version;
-
-  const _FlutterPackage({
-    required this.name,
-    required this.path,
-    required this.version,
-  });
-}
 
 String _sanitizeId(String raw) {
   if (raw.isEmpty) return 'unknown';
@@ -459,6 +408,7 @@ void _printUsage() {
     'Usage: document_throws_index [--no-packages] [--no-sdk] [--no-flutter]',
   );
   stdout.writeln('       document_throws_index --output=<path> [-q|--quiet]');
+  stdout.writeln('       document_throws_index --recreate');
 }
 
 String _defaultCacheRoot() {

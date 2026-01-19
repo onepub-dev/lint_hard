@@ -1,11 +1,11 @@
 # Throws Provenance (Design)
 
 This document describes a debug-mode provenance extension for the throws index
-and how the fix tool should surface provenance in `@Throws` annotations.
+and how the fix tool should surface provenance in `@Throwing` annotations.
 
 ## Goals
 - Always record provenance data for thrown exceptions in the throws cache.
-- Surface provenance in `@Throws` only when requested by the fix tool.
+- Surface provenance in `@Throwing` only when requested by the fix tool.
 - Distinguish between immediate call-site source and ultimate origin.
 
 ## Index Format (v1 with a flag)
@@ -80,10 +80,10 @@ dart:io|writeAsString
 - Add provenance records to the data section using the v1 provenance flag.
 
 ## Annotation Shape
-No enum. Use additional optional args in `@Throws`:
+No enum. Use additional optional args in `@Throwing`:
 
 ```dart
-@Throws(
+@Throwing(
   BadStateException,
   call: 'package:foo/bar.dart|Foo#baz(int)',
   origin: 'package:foo/bar.dart|Foo#baz(int)',
@@ -100,7 +100,7 @@ No enum. Use additional optional args in `@Throws`:
 
 ## Removal Path
 To remove provenance from code:
-1. Remove existing `@Throws` annotations.
+1. Remove existing `@Throwing` annotations.
 2. Re-run the fix tool without `--origin`.
 
 ## Open Questions
