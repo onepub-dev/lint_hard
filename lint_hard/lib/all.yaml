@@ -1,5 +1,7 @@
 # for a complete list of all possible lints see:
 # https://dart-lang.github.io/linter/lints/options/options.html
+plugins:
+  lint_hard:
 analyzer:
   language:
     strict-casts: true
