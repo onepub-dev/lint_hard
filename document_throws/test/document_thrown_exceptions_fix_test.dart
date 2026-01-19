@@ -590,4 +590,25 @@ void main() {
       ),
     );
   });
+
+  test('fix preserves blank doc comment lines without extra spaces', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_blank_lines.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      includeSource: false,
+      documentationStyle: DocumentationStyle.docComment,
+    );
+    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, edits);
+
+    expect(updated, contains('///\n/// The backup is placed'));
+    expect(updated, isNot(contains('/// \n/// The backup is placed')));
+  });
 }

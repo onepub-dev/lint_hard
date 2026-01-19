@@ -940,7 +940,9 @@ String _buildDocComment(
     final body = trimmed.map((line) => '$indent * $line').join('\n');
     return '$indent/**\n$body\n$indent */';
   }
-  final body = trimmed.map((line) => '$indent/// $line').join('\n');
+  final body = trimmed
+      .map((line) => line.isEmpty ? '$indent///' : '$indent/// $line')
+      .join('\n');
   return '$body\n';
 }
 
