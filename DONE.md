@@ -294,3 +294,5 @@ Doctor summary (to see all details, run flutter doctor -v):
 instructions on how to disable any of our custom lints.
 
 - [x] optimise the code and improve the code structure for the document_throws project.
+
+- [x] run a performance analysis looking for improvments for the document_throws project.

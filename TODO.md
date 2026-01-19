@@ -1,6 +1,4 @@
 
-- [] run a performance analysis looking for improvments for the document_throws project.
-
 - [] dt-fix and dt-index do not show an error and usage when an invalid
 command line arg is passed.  Redo all arg parsing with ArgParser and using the
 appropriate addFlag/option methods.
