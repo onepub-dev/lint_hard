@@ -24,19 +24,22 @@ String? flutterRoot(String? sdkRoot) {
   return null;
 }
 
-String flutterVersion(String flutterRootPath) {
+String? flutterVersion(String flutterRootPath) {
   final versionFile = File(p.join(flutterRootPath, 'version'));
   if (versionFile.existsSync()) {
     final value = versionFile.readAsStringSync().trim();
     if (value.isNotEmpty) return value;
   }
-  return 'unknown';
+  return null;
 }
 
 List<FlutterPackage> flutterPackages(
   String flutterRootPath,
-  String flutterSdkVersion,
+  String? flutterSdkVersion,
 ) {
+  if (flutterSdkVersion == null || flutterSdkVersion.isEmpty) {
+    return const <FlutterPackage>[];
+  }
   final packagesDir = Directory(p.join(flutterRootPath, 'packages'));
   if (!packagesDir.existsSync()) return const <FlutterPackage>[];
   final results = <FlutterPackage>[];

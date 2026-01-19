@@ -20,7 +20,9 @@ void main() {
       );
       File(p.join(root, 'version')).writeAsStringSync('3.9.0');
 
-      final packages = flutterPackages(root, flutterVersion(root));
+      final version = flutterVersion(root);
+      expect(version, isNotNull);
+      final packages = flutterPackages(root, version);
       expect(packages, hasLength(1));
       expect(packages.first.name, equals('flutter_test'));
       expect(packages.first.version, equals('3.9.0'));

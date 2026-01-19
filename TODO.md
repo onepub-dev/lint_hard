@@ -210,7 +210,7 @@ plus any other key decisions that affect the user experience.
 correct version of those dependencies. 
 We probably need to be reading the pubspec.lock file in order to do this.
 
-- [] I'm concerned about the indexing of the flutter sdk. I'm seeing
+- [x] I'm concerned about the indexing of the flutter sdk. I'm seeing
 a lot of unknowns. I'm concerned that this means we aren't finding the
 index when the lint is running.  Given the number of index
 files do we need an index for the index?
