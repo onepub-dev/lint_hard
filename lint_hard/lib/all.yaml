@@ -1,8 +1,6 @@
 # for a complete list of all possible lints see:
 # https://dart-lang.github.io/linter/lints/options/options.html
 analyzer:
-  plugins:
-    - lint_hard
   language:
     strict-casts: true
     strict-inference: true
@@ -76,6 +74,7 @@ linter:
     diagnostic_describe_all_properties : true
     directives_ordering : true
     discarded_futures : true
+    document_thrown_exceptions: true
     do_not_use_environment : true
     document_ignores : true
     empty_catches : true
@@ -83,6 +82,7 @@ linter:
     empty_statements : true
     eol_at_end_of_file : true
     exhaustive_cases : true
+    fields_first_constructors_next: true
     file_names : true
     flutter_style_todos : true
     hash_and_equals : true
