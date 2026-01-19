@@ -312,3 +312,5 @@ warning - or incorrect throws staments.
 - [x] The throws_index_up_to_date need to specify which (just the first)
 index needs to be updated - this is more for debugging purposes but
 is fine to leave in the production version.
+
+- [x] Document how to use the alternate annotation method
