@@ -163,7 +163,7 @@ Rename the annotation to @Throwing
 - [x] create a detail set of unit tests for parsing the doc comments for @Throwing
 including dealing with providing good errors via lint output.
 
-- [] trying to remove orgins with the fix command is still failing:
+- [x] trying to remove orgins with the fix command is still failing:
 
 ```
 
@@ -185,7 +185,7 @@ void main(List<String> args) {
 /// @Throwing(ArgumentError)
 ```
 
-- [] should there be a new line between the doc command and the method.
+- [x] should there be a new line between the doc command and the method.
 Implement whatever is the dart standard.
 
 ```
@@ -245,6 +245,7 @@ Instead it should only output the skipping message.
 - [x] in case the user switches between doc comments and annotations
 then we should remove the other type, where it is safe to do so.
 
+- [] running fix with the path to a source file and it fails to add throws
 
 
 - [x] optimise the code and improve the code structure.

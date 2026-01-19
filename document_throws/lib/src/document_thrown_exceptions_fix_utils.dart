@@ -835,6 +835,16 @@ String? _renderInsertionText(
 }
 
 bool _hasProvenanceDocTags(Comment? comment) {
+  if (comment == null) return false;
+  final lines = _docCommentLines(comment);
+  final hasThrowing = lines.any(
+    (line) => line.trimLeft().startsWith(throwingDocTag),
+  );
+  if (!hasThrowing) return false;
+  final hasProvenance = lines.any(
+    (line) => _docThrowingLineKind(line) == _DocThrowingLineKind.provenance,
+  );
+  if (hasProvenance) return true;
   return _parseDocThrowingTags(comment)
       .any((tag) => tag.hasProvenance);
 }
@@ -857,10 +867,7 @@ List<SourceEdit> _removeDocThrowingTags(
   if (comment == null) return const <SourceEdit>[];
   final source = content.substring(comment.offset, comment.end);
   final lines = source.split(RegExp(r'\r?\n'));
-  final filtered = [
-    for (final line in lines)
-      if (!line.contains(throwingDocTag)) line,
-  ];
+  final filtered = _stripDocThrowingLines(lines);
   if (filtered.length == lines.length) return const <SourceEdit>[];
   final replacement = filtered.join('\n');
   return [
@@ -876,12 +883,20 @@ String _replaceDocThrowingTags(
   _DocCommentStyle style,
 ) {
   final existingLines = _docCommentLines(comment);
-  final kept = [
-    for (final line in existingLines)
-      if (!line.trimLeft().startsWith(throwingDocTag)) line,
-  ];
+  final kept = _stripDocThrowingLines(existingLines);
   final merged = [...kept, ...newLines];
-  return _buildDocComment(merged, indent, style);
+  var updated = _buildDocComment(merged, indent, style);
+  if (updated.endsWith('\n') &&
+      comment.end < content.length &&
+      content.substring(comment.end).startsWith('\n')) {
+    updated = updated.substring(0, updated.length - 1);
+  }
+  if (updated.endsWith('\n') &&
+      comment.end + 1 < content.length &&
+      content.substring(comment.end).startsWith('\r\n')) {
+    updated = updated.substring(0, updated.length - 1);
+  }
+  return updated;
 }
 
 List<String> _docCommentLines(Comment comment) {
@@ -910,11 +925,15 @@ String _buildDocComment(
   String indent,
   _DocCommentStyle style,
 ) {
+  final trimmed = List<String>.from(lines);
+  while (trimmed.isNotEmpty && trimmed.last.trim().isEmpty) {
+    trimmed.removeLast();
+  }
   if (style == _DocCommentStyle.block) {
-    final body = lines.map((line) => '$indent * $line').join('\n');
+    final body = trimmed.map((line) => '$indent * $line').join('\n');
     return '$indent/**\n$body\n$indent */';
   }
-  final body = lines.map((line) => '$indent/// $line').join('\n');
+  final body = trimmed.map((line) => '$indent/// $line').join('\n');
   return '$body\n';
 }
 
@@ -948,6 +967,64 @@ List<_DocThrowingTag> _parseDocThrowingTags(Comment? comment) {
   if (comment == null) return const <_DocThrowingTag>[];
   final text = _docCommentLines(comment).join('\n');
   return _extractDocThrowingTags(text);
+}
+
+enum _DocThrowingLineKind { throwingTag, provenance, close, type, other }
+
+String _docLineContentForDetection(String line) {
+  final trimmed = line.trimLeft();
+  if (trimmed.startsWith('///')) {
+    return _stripDocLinePrefix(line, '///');
+  }
+  if (trimmed.startsWith('/**')) {
+    return trimmed.substring(3).trimLeft();
+  }
+  if (trimmed.startsWith('*/')) return '';
+  if (trimmed.startsWith('*')) return _stripBlockDocLine(line);
+  return line;
+}
+
+_DocThrowingLineKind _docThrowingLineKind(String line) {
+  final trimmed = _docLineContentForDetection(line).trimLeft();
+  if (trimmed.startsWith(throwingDocTag)) return _DocThrowingLineKind.throwingTag;
+  if (trimmed.startsWith('call:') || trimmed.startsWith('origin:')) {
+    return _DocThrowingLineKind.provenance;
+  }
+  if (trimmed == ')') return _DocThrowingLineKind.close;
+  if (trimmed.endsWith(',')) return _DocThrowingLineKind.type;
+  return _DocThrowingLineKind.other;
+}
+
+List<String> _stripDocThrowingLines(List<String> lines) {
+  if (lines.isEmpty) return lines;
+  final result = <String>[];
+  for (var i = 0; i < lines.length; i++) {
+    final line = lines[i];
+    final kind = _docThrowingLineKind(line);
+    if (kind == _DocThrowingLineKind.throwingTag) {
+      continue;
+    }
+    if (kind == _DocThrowingLineKind.provenance) {
+      continue;
+    }
+    if (kind == _DocThrowingLineKind.close) {
+      final prevKind =
+          i > 0 ? _docThrowingLineKind(lines[i - 1]) : _DocThrowingLineKind.other;
+      if (prevKind == _DocThrowingLineKind.provenance ||
+          prevKind == _DocThrowingLineKind.type) {
+        continue;
+      }
+    }
+    if (kind == _DocThrowingLineKind.type) {
+      final nextKind =
+          i + 1 < lines.length ? _docThrowingLineKind(lines[i + 1]) : _DocThrowingLineKind.other;
+      if (nextKind == _DocThrowingLineKind.provenance) {
+        continue;
+      }
+    }
+    result.add(line);
+  }
+  return result;
 }
 
 List<_DocThrowingTag> _extractDocThrowingTags(String text) {
