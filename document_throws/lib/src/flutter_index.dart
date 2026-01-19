@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -29,6 +30,23 @@ String? flutterVersion(String flutterRootPath) {
   if (versionFile.existsSync()) {
     final value = versionFile.readAsStringSync().trim();
     if (value.isNotEmpty) return value;
+  }
+  final flutterBin = File(p.join(flutterRootPath, 'bin', 'flutter'));
+  if (!flutterBin.existsSync()) return null;
+  try {
+    final result = Process.runSync(
+      flutterBin.path,
+      const ['--version', '--machine'],
+    );
+    if (result.exitCode != 0) return null;
+    final output = result.stdout;
+    if (output is! String || output.trim().isEmpty) return null;
+    final decoded = jsonDecode(output.trim());
+    if (decoded is! Map) return null;
+    final version = decoded['frameworkVersion']?.toString().trim();
+    if (version != null && version.isNotEmpty) return version;
+  } catch (_) {
+    return null;
   }
   return null;
 }

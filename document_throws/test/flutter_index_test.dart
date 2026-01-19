@@ -31,6 +31,29 @@ void main() {
     }
   });
 
+  test('flutterVersion falls back to flutter --version --machine', () async {
+    if (Platform.isWindows) {
+      return;
+    }
+    final tempDir = await Directory.systemTemp
+        .createTemp('document_throws_flutter_version_');
+    try {
+      final root = tempDir.path;
+      final binDir = Directory(p.join(root, 'bin'))..createSync();
+      final flutterBin = File(p.join(binDir.path, 'flutter'))
+        ..writeAsStringSync(
+          '#!/bin/sh\n'
+          'echo \'{"frameworkVersion":"3.41.0-0.0.pre"}\'\n',
+        );
+      Process.runSync('chmod', ['+x', flutterBin.path]);
+
+      final version = flutterVersion(root);
+      expect(version, equals('3.41.0-0.0.pre'));
+    } finally {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
   test('flutterRoot resolves from sdk root', () async {
     final tempDir = await Directory.systemTemp
         .createTemp('document_throws_flutter_root_');

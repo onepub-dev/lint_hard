@@ -12,6 +12,9 @@ Once you complete a todo, mark it as complete.
 Re-read the TODO.md file and then work on the next 
 todo item - in order.
 
+Once a todo item is complete, move it into DONE.md.
+
+
 
 # When writing documentation:
 
