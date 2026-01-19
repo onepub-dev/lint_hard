@@ -242,6 +242,7 @@ Future<Map<String, ThrowsCacheEntry>> _indexLibraries(
   final session = context.currentSession;
   final entries = <String, ThrowsCacheEntry>{};
   final seenLibraries = <String>{};
+  final resolvedLibraries = <ResolvedLibraryResult>[];
   log?.call('  Resolving libraries...');
 
   for (final file in files) {
@@ -249,8 +250,25 @@ Future<Map<String, ThrowsCacheEntry>> _indexLibraries(
     if (resolved is! ResolvedLibraryResult) continue;
     final libraryPath = resolved.element.firstFragment.source.fullName;
     if (!seenLibraries.add(libraryPath)) continue;
+    resolvedLibraries.add(resolved);
+  }
+
+  final globalUnitsByPath = <String, CompilationUnit>{};
+  for (final resolved in resolvedLibraries) {
+    for (final unit in resolved.units) {
+      globalUnitsByPath[unit.path] = unit.unit;
+    }
+  }
+
+  for (final resolved in resolvedLibraries) {
     final libraryUri = _libraryUriFor(resolved, rootPath, packageName);
-    entries.addAll(buildThrowsIndex(resolved, libraryUri: libraryUri));
+    entries.addAll(
+      buildThrowsIndex(
+        resolved,
+        libraryUri: libraryUri,
+        unitsByPath: globalUnitsByPath,
+      ),
+    );
   }
   await collection.dispose();
   return entries;

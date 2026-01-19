@@ -245,7 +245,52 @@ Instead it should only output the skipping message.
 - [x] in case the user switches between doc comments and annotations
 then we should remove the other type, where it is safe to do so.
 
-- [] running fix with the path to a source file and it fails to add throws
+- [x] method not annotated when core.restoreFile throws exception.
+In the dcli project ~/git/dcli/dcli and ~/git/dcli/dcli_core the
+restoreFile method in lib/src/functions/backup.dart calls a method
+of the same name in the dcli_core package. The problem is that the 
+throws statements are not being added by the fix app.
+
+```dart
+/// Designed to work with [backupFile] to restore
+/// a file from backup.
+/// The existing file is deleted and restored
+/// from the `.bak/<filename>.bak` file created when
+/// you called [backupFile].
+///
+/// Consider using [withFileProtectionAsync] for a more robust solution.
+///
+/// When the last .bak file is restored, the .bak directory
+/// will be deleted. If you don't restore all files (your app crashes)
+/// then a .bak directory and files may be left hanging around and you may
+/// need to manually restore these files.
+void restoreFile(String pathToFile, {bool ignoreMissing = false}) =>
+    core.restoreFile(pathToFile, ignoreMissing: ignoreMissing);
+```    
+
+- [] the indexer is reporting:
+
+```
+Unable to determine Flutter SDK version; skipping Flutter index.
+```
+
+we need to determine why. Perhaps we need to determine a more reliable way
+of determine the flutter verions.
+
+```
+flutter doctor
+Doctor summary (to see all details, run flutter doctor -v):
+[✓] Flutter (Channel beta, 3.41.0-0.0.pre, on Ubuntu 25.10 6.11.0-26-generic, locale en_AU.UTF-8)
+[✓] Android toolchain - develop for Android devices (Android SDK version 36.0.0)
+[✓] Chrome - develop for the web
+[✓] Linux toolchain - develop for Linux desktop
+[✓] Connected device (2 available)
+[✓] Network resources
+
+• No issues found!
+```
+
+
 
 
 - [x] optimise the code and improve the code structure.

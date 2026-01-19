@@ -10,12 +10,13 @@ import 'throws_cache.dart';
 Map<String, ThrowsCacheEntry> buildThrowsIndex(
   ResolvedLibraryResult library, {
   String? libraryUri,
+  Map<String, CompilationUnit>? unitsByPath,
 }) {
-  final unitsByPath = _unitsByPath(library.units);
+  final resolvedUnits = unitsByPath ?? _unitsByPath(library.units);
   final entries = <String, ThrowsCacheEntry>{};
   final visitor = _ExecutableIndexCollector(
     libraryUri ?? library.element.firstFragment.source.uri.toString(),
-    unitsByPath,
+    resolvedUnits,
     entries,
   );
 
