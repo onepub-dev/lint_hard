@@ -1005,13 +1005,29 @@ _DocThrowingLineKind _docThrowingLineKind(String line) {
 List<String> _stripDocThrowingLines(List<String> lines) {
   if (lines.isEmpty) return lines;
   final result = <String>[];
+  var inThrowingBlock = false;
   for (var i = 0; i < lines.length; i++) {
     final line = lines[i];
     final kind = _docThrowingLineKind(line);
     if (kind == _DocThrowingLineKind.throwingTag) {
+      final content = _docLineContentForDetection(line);
+      final open = content.indexOf('(');
+      if (open == -1 || content.indexOf(')', open + 1) == -1) {
+        inThrowingBlock = true;
+      }
+      continue;
+    }
+    if (inThrowingBlock) {
+      if (kind == _DocThrowingLineKind.close) {
+        inThrowingBlock = false;
+      }
       continue;
     }
     if (kind == _DocThrowingLineKind.provenance) {
+      continue;
+    }
+    if (kind == _DocThrowingLineKind.type &&
+        _hasProvenanceOrCloseAhead(lines, i)) {
       continue;
     }
     if (kind == _DocThrowingLineKind.close) {
@@ -1022,16 +1038,21 @@ List<String> _stripDocThrowingLines(List<String> lines) {
         continue;
       }
     }
-    if (kind == _DocThrowingLineKind.type) {
-      final nextKind =
-          i + 1 < lines.length ? _docThrowingLineKind(lines[i + 1]) : _DocThrowingLineKind.other;
-      if (nextKind == _DocThrowingLineKind.provenance) {
-        continue;
-      }
-    }
     result.add(line);
   }
   return result;
+}
+
+bool _hasProvenanceOrCloseAhead(List<String> lines, int start) {
+  for (var i = start + 1; i < lines.length; i++) {
+    final kind = _docThrowingLineKind(lines[i]);
+    if (kind == _DocThrowingLineKind.provenance ||
+        kind == _DocThrowingLineKind.close) {
+      return true;
+    }
+    if (kind != _DocThrowingLineKind.type) return false;
+  }
+  return false;
 }
 
 List<_DocThrowingTag> _extractDocThrowingTags(String text) {

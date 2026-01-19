@@ -562,4 +562,32 @@ void main() {
       contains(RegExp(r'/// @Throwing\(ArgumentError\)\nvoid main')),
     );
   });
+
+  test('fix removes provenance without leaving hanging type lines', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_remove_origin_reason.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      includeSource: false,
+      documentationStyle: DocumentationStyle.docComment,
+    );
+    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, edits);
+
+    expect(updated, isNot(contains('call:')));
+    expect(updated, isNot(contains('origin:')));
+    expect(updated, isNot(contains('/// ArgumentError,')));
+    expect(
+      updated,
+      contains(
+        "/// @Throwing(ArgumentError, reason: 'Because bad things')\nvoid main",
+      ),
+    );
+  });
 }
