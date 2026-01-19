@@ -956,7 +956,9 @@ String _buildDocComment(
 String _stripDocLinePrefix(String line, String prefix) {
   final index = line.indexOf(prefix);
   if (index == -1) return line.trim();
-  return line.substring(index + prefix.length);
+  final content = line.substring(index + prefix.length);
+  if (content.trim().isEmpty) return '';
+  return content;
 }
 
 String _stripBlockDocLine(String line) {
