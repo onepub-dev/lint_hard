@@ -7,10 +7,9 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/error/error.dart';
 
 import 'document_thrown_exceptions.dart';
-import 'throws_cache_lookup.dart';
 import 'throwing_annotation.dart';
 import 'throwing_doc_parser.dart';
-import 'unit_provider.dart';
+import 'throws_cache_lookup.dart';
 
 class ThrowingUnthrownException extends AnalysisRule {
   static const LintCode code = LintCode(
