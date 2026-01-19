@@ -303,7 +303,7 @@ Set<String> docCommentMentionsWithoutThrows(
   Map<String, CompilationUnit>? unitsByPath,
   ThrowsCacheLookup? externalLookup,
 }) {
-  final mentions = DocCommentAnalyzer().mentionedTypes(comment);
+  final mentions = DocCommentAnalyzer().inlineMentionedTypes(comment);
   if (mentions.isEmpty) return const <String>{};
   final thrown = collectThrownTypeNames(
     body,

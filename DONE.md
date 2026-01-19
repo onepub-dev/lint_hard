@@ -305,3 +305,6 @@ appropriate addFlag/option methods.
 in side a comment with [] is an exception.
 
 - [x] We are getting line lengths that are exceeding 80 chars
+
+- [x] on the main methods of every test I'm getting what appears to be an incorrect
+warning - or incorrect throws staments.

@@ -125,7 +125,7 @@ class _Visitor extends SimpleAstVisitor<void> {
 
     if (documentationStyle == DocumentationStyle.docComment) {
       final mentions =
-          DocCommentAnalyzer().mentionedTypes(documentationComment);
+          DocCommentAnalyzer().inlineMentionedTypes(documentationComment);
       if (mentions.isNotEmpty) {
         final unthrown = mentions.difference(thrownResults.types);
         if (unthrown.isNotEmpty) {

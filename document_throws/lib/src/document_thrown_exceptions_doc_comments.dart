@@ -18,6 +18,13 @@ class DocCommentAnalyzer {
   }
 
   Set<String> mentionedTypes(Comment? comment) {
+    final mentioned = <String>{};
+    mentioned.addAll(inlineMentionedTypes(comment));
+    mentioned.addAll(thrownTypes(comment));
+    return mentioned;
+  }
+
+  Set<String> inlineMentionedTypes(Comment? comment) {
     if (comment == null) return const <String>{};
     final mentioned = <String>{};
     for (final reference in comment.references) {
@@ -29,7 +36,6 @@ class DocCommentAnalyzer {
         mentioned.add(normalized);
       }
     }
-    mentioned.addAll(thrownTypes(comment));
     return mentioned;
   }
 
