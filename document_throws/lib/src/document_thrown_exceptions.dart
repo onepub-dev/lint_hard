@@ -120,15 +120,16 @@ class _Visitor extends SimpleAstVisitor<void> {
     // Fast exit when no throw token appears in the body.
     if (body is EmptyFunctionBody) return;
 
+    final thrownResults = _collectThrownTypes(
+      body,
+      unitsByPath: unitsByPath,
+      externalLookup: externalLookup,
+    );
+
     if (documentationStyle == DocumentationStyle.docComment) {
       final mentions = _docCommentMentionedTypes(documentationComment);
       if (mentions.isNotEmpty) {
-        final thrownTypes = collectThrownTypeNames(
-          body,
-          unitsByPath: unitsByPath,
-          externalLookup: externalLookup,
-        );
-        final unthrown = mentions.difference(thrownTypes);
+        final unthrown = mentions.difference(thrownResults.types);
         if (unthrown.isNotEmpty) {
           final label = (unthrown.toList()..sort()).join(', ');
           rule.reportAtToken(
@@ -160,6 +161,7 @@ class _Visitor extends SimpleAstVisitor<void> {
       documentationStyle: documentationStyle,
       unitsByPath: unitsByPath,
       externalLookup: externalLookup,
+      thrownResults: thrownResults,
     );
     if (missing.isEmpty) return;
 
@@ -223,6 +225,7 @@ Set<String> missingThrownTypeDocs(
   bool allowSourceFallback = false,
   Map<String, CompilationUnit>? unitsByPath,
   ThrowsCacheLookup? externalLookup,
+  _ThrownTypeResults? thrownResults,
 }) {
   final missing = missingThrownTypeInfos(
     body,
@@ -232,6 +235,7 @@ Set<String> missingThrownTypeDocs(
     allowSourceFallback: allowSourceFallback,
     unitsByPath: unitsByPath,
     externalLookup: externalLookup,
+    thrownResults: thrownResults,
   );
   return {for (final info in missing) info.name};
 }
@@ -245,19 +249,22 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
   Map<String, CompilationUnit>? unitsByPath,
   ThrowsCacheLookup? externalLookup,
   bool includeLineNumbersForAll = false,
+  _ThrownTypeResults? thrownResults,
 }) {
   // Prefer AST; optionally fallback to source parsing for edge cases.
-  final thrownResults = _collectThrownTypes(
-    body,
-    unitsByPath: unitsByPath,
-    externalLookup: externalLookup,
-    includeLineNumbersForAll: includeLineNumbersForAll,
-  );
-  final thrownTypes = thrownResults.types;
+  final effectiveResults =
+      thrownResults ??
+      _collectThrownTypes(
+        body,
+        unitsByPath: unitsByPath,
+        externalLookup: externalLookup,
+        includeLineNumbersForAll: includeLineNumbersForAll,
+      );
+  final thrownTypes = effectiveResults.types;
   if (thrownTypes.isEmpty &&
       allowSourceFallback &&
-      (thrownResults.sawUnknownThrowExpression ||
-          !thrownResults.sawThrowExpression)) {
+      (effectiveResults.sawUnknownThrowExpression ||
+          !effectiveResults.sawThrowExpression)) {
     thrownTypes.addAll(_collectThrownTypesFromSource(body.toSource()));
   }
   if (thrownTypes.isEmpty) return const <ThrownTypeInfo>[];
@@ -266,7 +273,7 @@ List<ThrownTypeInfo> missingThrownTypeInfos(
       ? _annotationThrownTypes(metadata)
       : _docCommentMentionedTypes(documentationComment);
   final byName = <String, ThrownTypeInfo>{};
-  for (final info in thrownResults.infos) {
+  for (final info in effectiveResults.infos) {
     final existing = byName[info.name];
     if (existing == null) {
       byName[info.name] = info;

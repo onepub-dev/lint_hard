@@ -247,6 +247,6 @@ then we should remove the other type, where it is safe to do so.
 
 
 
-- [] optimise the code and improve the code structure.
+- [x] optimise the code and improve the code structure.
 
 - [] run a performance analysis looking for improvments.
