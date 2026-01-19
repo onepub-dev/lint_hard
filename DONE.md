@@ -295,3 +295,4 @@ instructions on how to disable any of our custom lints.
 
 - [x] optimise the code and improve the code structure.
 
+- [x] run a performance analysis looking for improvments.
