@@ -7,8 +7,6 @@ analyzer:
     strict-casts: true
     strict-inference: true
     strict-raw-types: true
-  plugins:
-    - lint_hard
 linter:
   rules:
     always_declare_return_types : true
