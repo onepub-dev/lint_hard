@@ -3,6 +3,7 @@ import 'package:analysis_server_plugin/registry.dart';
 
 import 'src/document_thrown_exceptions.dart';
 import 'src/document_thrown_exceptions_fix.dart';
+import 'src/documented_unthrown_exception.dart';
 import 'src/throws_index_up_to_date.dart';
 
 final plugin = DocumentThrowsPlugin();
@@ -14,6 +15,7 @@ class DocumentThrowsPlugin extends Plugin {
   @override
   void register(PluginRegistry registry) {
     registry.registerWarningRule(DocumentThrownExceptions());
+    registry.registerWarningRule(ThrowingUnthrownException());
     registry.registerFixForRule(
       DocumentThrownExceptions.code,
       DocumentThrownExceptionsFix.new,

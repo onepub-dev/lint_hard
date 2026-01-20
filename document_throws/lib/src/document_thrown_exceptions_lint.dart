@@ -16,7 +16,7 @@ class DocumentThrownExceptions extends MultiAnalysisRule {
     'document_thrown_exceptions',
     'Document thrown exception types with @Throwing. Missing: {0}.',
     correctionMessage:
-        'Add @Throwing(ExceptionType) in docs or annotations for each thrown '
+        'Add @Throwing(<ExceptionType>) in docs or annotations for each thrown '
         'exception class.',
   );
   static const LintCode malformedDocCode = LintCode(

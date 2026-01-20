@@ -51,7 +51,7 @@ You can see the full set of lints in `package:lint_hard/all.yaml`.
           document_thrown_exceptions: true
           throws_index_up_to_date: true
           fields_first_constructors_next: true
-          documented_unthrown_exception: true
+          unthrown_exceptions_documented: true
     ```
 
    To disable custom lint_hard plugin lints while keeping the lint set,

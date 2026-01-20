@@ -37,7 +37,6 @@ plugins:
     diagnostics:
       - document_thrown_exceptions
       - fields_first_constructors_next
-      - documented_unthrown_exception
 ''',
       );
 
@@ -102,7 +101,6 @@ class BadOrder {
       final codes = channel.analysisErrors.map((e) => e.code).toSet();
       expect(codes, contains('document_thrown_exceptions'));
       expect(codes, contains('fields_first_constructors_next'));
-      expect(codes, contains('documented_unthrown_exception'));
     } finally {
       await tempDir.delete(recursive: true);
     }

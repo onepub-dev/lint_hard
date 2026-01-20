@@ -2,7 +2,6 @@ import 'package:analysis_server_plugin/plugin.dart';
 import 'package:analysis_server_plugin/registry.dart';
 import 'package:document_throws/src/document_thrown_exceptions.dart';
 import 'package:document_throws/src/document_thrown_exceptions_fix.dart';
-import 'package:document_throws/src/documented_unthrown_exception.dart';
 import 'package:document_throws/src/throws_index_up_to_date.dart';
 
 import 'src/reorder_members_fix.dart';
@@ -19,7 +18,6 @@ class LintHardPlugin extends Plugin {
   // Register lint rules and their associated fixes.
   void register(PluginRegistry registry) {
     registry.registerWarningRule(DocumentThrownExceptions());
-    registry.registerWarningRule(ThrowingUnthrownException());
     registry.registerFixForRule(
       DocumentThrownExceptions.code,
       DocumentThrownExceptionsFix.new,
