@@ -20,7 +20,7 @@ class DocumentThrownExceptions extends MultiAnalysisRule {
         'exception class.',
   );
   static const LintCode malformedDocCode = LintCode(
-    'document_thrown_exceptions_malformed_doc',
+    'malformed_exception_documentation',
     'Malformed @Throwing doc comment: {0}',
     correctionMessage: 'Use @Throwing(ExceptionType, ...) in doc comments.',
   );

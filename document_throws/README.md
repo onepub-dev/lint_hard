@@ -26,7 +26,7 @@ The document_throws package implements:
  all exceptions: `document_thrown_exceptions`
  2. a lint to inform you when an exception which is documented isn't actually
  thrown: `unthrown_exceptions_documented`
- 3. a lint if the @Throwing documentation is malformed: `document_thrown_exceptions_malformed_doc`
+ 3. a lint if the @Throwing documentation is malformed: `malformed_exception_documentation`
  4. a lint that informs you if the required indexes don't exist: `throws_index_up_to_date`
 
 The `document_throws` package treats Error subclasses the same as Exception because
