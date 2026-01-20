@@ -79,7 +79,10 @@ Map<String, List<SourceEdit>> documentThrownExceptionEdits(
     final insertOffset = documentationStyle == DocumentationStyle.annotation
         ? _annotationInsertOffset(content, target)
         : _docCommentInsertOffset(content, target, commentStyle);
-    final indent = indentAtOffset(content, target.declarationOffset);
+    final indent = documentationStyle == DocumentationStyle.docComment &&
+            target.documentationComment != null
+        ? indentAtOffset(content, target.documentationComment!.offset)
+        : indentAtOffset(content, target.declarationOffset);
     final libraryUri = unitResult.libraryFragment.source.uri.toString();
     final importData = _collectImportPrefixes(importTarget.unit);
     final sortedMissing = thrownInfos.toList()
