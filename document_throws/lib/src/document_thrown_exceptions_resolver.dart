@@ -4,6 +4,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/source/line_info.dart';
 
 import 'document_thrown_exceptions_collector.dart';
+import 'document_thrown_exceptions_type_names.dart';
 import 'throws_cache.dart';
 import 'throws_cache_lookup.dart';
 import 'unit_provider.dart';
@@ -50,6 +51,9 @@ class ThrownTypeResolver implements ThrownTypeLookup {
       final cached = externalLookup?.lookupWithProvenance(element);
       if (cached != null) {
         for (final entry in cached) {
+          if (typeNameNormalizer.normalizeTypeName(entry.name) == null) {
+            continue;
+          }
           infos.add(
             ThrownTypeInfo(
               entry.name,

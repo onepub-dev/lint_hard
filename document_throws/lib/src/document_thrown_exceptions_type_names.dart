@@ -15,7 +15,12 @@ class TypeNameNormalizer {
       name = name.substring(dotIndex + 1);
     }
 
-    if (name == 'dynamic' || name == 'Object' || name == 'Never') return null;
+    if (name == 'dynamic' ||
+        name == 'Object' ||
+        name == 'Never' ||
+        name == 'InvalidType') {
+      return null;
+    }
     return name;
   }
 
