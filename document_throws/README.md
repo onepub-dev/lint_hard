@@ -102,9 +102,6 @@ as to why the exception is thrown.
 ```
 @Throwing(ArgumentError, reason: "You passed an invalid argument")
 ```
-
-
-
 ### Annotations
 The annotation form is identical to the dart doc form except that it
 is a Dart Annotation.
@@ -127,9 +124,11 @@ fix tool so existing docs are rewritten.
 dart pub add document_throws_annotation
 ```
 
+In your analysis_options.yaml add
 ```yaml
-document_throws:
-  documentation_style: annotation
+plugins: 
+  document_throws:
+    documentation_style: annotation
 ```
 
 ```

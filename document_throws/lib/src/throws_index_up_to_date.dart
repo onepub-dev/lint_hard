@@ -11,7 +11,7 @@ class ThrowsIndexUpToDate extends AnalysisRule {
   static const LintCode code = LintCode(
     'throws_index_up_to_date',
     'Throws cache is missing or out of date (missing: {0}).',
-    correctionMessage: 'Run document_throws_index to refresh the throws cache.',
+    correctionMessage: 'Run dt-index to refresh the throws cache.',
   );
 
   ThrowsIndexUpToDate()
