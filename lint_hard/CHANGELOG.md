@@ -1,3 +1,7 @@
+# 7.1.1
+- split the document_throws code into its own package and now depend on that.
+- numerous fixes to document_throws.
+
 # 7.1.0
 - added the `throwing_unthrown_exception` lint for `@Throwing` types that are not thrown.
 - improved `document_throws_fix` handling for provenance cleanup and doc comment formatting.

@@ -1,5 +1,5 @@
 name: lint_hard
-version: 7.1.0
+version: 7.1.1
 homepage: https://github.com/noojee/lint_hard.git
 description: All the lints except where they clash.
 repository: https://github.com/noojee/lint_hard.git
@@ -10,7 +10,7 @@ dependencies:
   analyzer: ^9.0.0
   analyzer_plugin: ^0.13.11
   analysis_server_plugin: ^0.3.4
-  document_throws: ^0.1.0
+  document_throws: ^0.2.0
   document_throws_annotation: ^0.1.0
   glob: ^2.1.2
   path: ^1.9.0
