@@ -64,10 +64,9 @@ The structured doc comment has two forms:
   Using a structured syntax allows document_throws to extract the existing
   list and update it should the list of exceptions change.
 
-  The document_throws package tries to honour existing documentation. If the function's
-  doc comment contains 'Throws' we assume that any [types] noted in the doc comment
-  constitute documentation for that Type being thrown and we will not
-  add an additional @Throws for those types.
+  Free-form "Throws ..." sentences are not treated as documentation by default.
+  Use @Throwing for any exception you want to document. If you want to honor
+  free-form doc mentions when running the fix tool, use `dt-fix --honor-doc-mentions`.
 
 #### Basic form
 The basic form of the doc comment takes the form:
@@ -242,6 +241,13 @@ To update your exception documentation for the entire project run:
 ```
 cd <my Dart application root>
 dt-fix
+```
+
+By default dt-fix ignores free-form doc comment mentions and relies on @Throwing.
+If you want to honor free-form mentions when running the fix tool, pass:
+
+```
+dt-fix --honor-doc-mentions
 ```
 
 If you want use the annotation form rather than the doc comment form then run:
