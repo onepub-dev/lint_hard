@@ -29,6 +29,10 @@ The document_throws package implements:
  3. a lint if the @Throwing documentation is malformed: `document_thrown_exceptions_malformed_doc`
  4. a lint that informs you if the required indexes don't exist: `throws_index_up_to_date`
 
+The `document_throws` package treats Error subclasses the same as Exception because
+public APIs often throw ArgumentError, StateError, or RangeError and those
+are still useful to document.
+
 ### Exhaustive list of exceptions
 By 'exhaustively' we mean that document_throws examines not just the immediate
 called function but every function in the call stack, including third
@@ -344,4 +348,3 @@ the `document_throws_annotation`  package.
 
 The annotation is named `@Throwing` to avoid clashes with `Throws` in the test
 package while still describing its intent.
-

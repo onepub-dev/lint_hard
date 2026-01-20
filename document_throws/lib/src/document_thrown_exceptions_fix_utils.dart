@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:analyzer/dart/analysis/results.dart';
@@ -897,6 +898,25 @@ String _replaceDocThrowingTags(
   String indent,
   _DocCommentStyle style,
 ) {
+  if (style == _DocCommentStyle.line) {
+    final source = content.substring(comment.offset, comment.end);
+    final existingLines = LineSplitter.split(source).toList();
+    final kept = _stripDocThrowingLines(existingLines);
+    final prefixedNew = _prefixLineDocCommentLines(newLines, indent);
+    final merged = [...kept, ...prefixedNew];
+    var updated = merged.join('\n');
+    if (updated.endsWith('\n') &&
+        comment.end < content.length &&
+        content.substring(comment.end).startsWith('\n')) {
+      updated = updated.substring(0, updated.length - 1);
+    }
+    if (updated.endsWith('\n') &&
+        comment.end + 1 < content.length &&
+        content.substring(comment.end).startsWith('\r\n')) {
+      updated = updated.substring(0, updated.length - 1);
+    }
+    return updated;
+  }
   final existingLines = _docCommentLines(comment);
   final kept = _stripDocThrowingLines(existingLines);
   final merged = [...kept, ...newLines];
@@ -912,6 +932,17 @@ String _replaceDocThrowingTags(
     updated = updated.substring(0, updated.length - 1);
   }
   return updated;
+}
+
+List<String> _prefixLineDocCommentLines(List<String> lines, String indent) {
+  return [
+    for (final line in lines)
+      line.isEmpty
+          ? '$indent///'
+          : line.startsWith(' ')
+          ? '$indent///$line'
+          : '$indent/// $line',
+  ];
 }
 
 List<String> _docCommentLines(Comment comment) {

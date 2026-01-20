@@ -314,3 +314,6 @@ index needs to be updated - this is more for debugging purposes but
 is fine to leave in the production version.
 
 - [x] Document how to use the alternate annotation method
+
+- [x] show we be documenting exceptions that extend error?
+In theory error should not be caught?
