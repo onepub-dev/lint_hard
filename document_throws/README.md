@@ -90,6 +90,10 @@ The extended form of the doc comment takes the form:
 /// @Throwing(InvalidType, call: 'matcher|expect', origin: 'matcher|fail')
 ```
 
+#### reason
+For both the doc comments and the annotations you can provide a reason
+f
+
 ### Annotations
 The annotation form is identical to the dart doc form except that it
 is a Dart Annotation.

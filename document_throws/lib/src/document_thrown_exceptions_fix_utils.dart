@@ -902,7 +902,9 @@ String _replaceDocThrowingTags(
     final source = content.substring(comment.offset, comment.end);
     final existingLines = LineSplitter.split(source).toList();
     final kept = _stripDocThrowingLines(existingLines);
-    final prefixedNew = _prefixLineDocCommentLines(newLines, indent);
+    final docIndent =
+        _lineDocCommentIndentFromContent(content, comment) ?? indent;
+    final prefixedNew = _prefixLineDocCommentLines(newLines, docIndent);
     final merged = [...kept, ...prefixedNew];
     var updated = merged.join('\n');
     if (updated.endsWith('\n') &&
@@ -943,6 +945,13 @@ List<String> _prefixLineDocCommentLines(List<String> lines, String indent) {
           ? '$indent///$line'
           : '$indent/// $line',
   ];
+}
+
+String? _lineDocCommentIndentFromContent(String content, Comment comment) {
+  final index = content.indexOf('///', comment.offset);
+  if (index == -1 || index >= comment.end) return null;
+  final start = lineStart(content, index);
+  return content.substring(start, index);
 }
 
 List<String> _docCommentLines(Comment comment) {
