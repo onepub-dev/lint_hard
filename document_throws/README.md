@@ -92,7 +92,19 @@ The extended form of the doc comment takes the form:
 
 #### reason
 For both the doc comments and the annotations you can provide a reason
-f
+as to why the exception is thrown.
+
+##### Basic:
+```
+/// @Throwing(ArgumentError, reason: "You passed an invalid argument")
+```
+
+##### Annotation:
+```
+@Throwing(ArgumentError, reason: "You passed an invalid argument")
+```
+
+
 
 ### Annotations
 The annotation form is identical to the dart doc form except that it
