@@ -272,6 +272,8 @@ class _RethrowFinder extends RecursiveAstVisitor<void> {
 // Normalize a thrown expression into a type name and type, if available.
 ThrownTypeInfo? _thrownTypeFromExpression(Expression expression) {
   if (expression is InstanceCreationExpression) {
+    final staticType = expression.staticType;
+    if (staticType is InvalidType) return null;
     final typeName = expression.constructorName.type.name.lexeme;
     final normalized = typeNameNormalizer.normalizeTypeName(typeName);
     if (normalized == null) return null;
@@ -280,6 +282,7 @@ ThrownTypeInfo? _thrownTypeFromExpression(Expression expression) {
 
   final staticType = expression.staticType;
   if (staticType == null) return null;
+  if (staticType is InvalidType) return null;
 
   final displayName = staticType.getDisplayString();
   final normalized = typeNameNormalizer.normalizeTypeName(displayName);

@@ -1,0 +1,3 @@
+void invalidTypeThrow() {
+  throw missingValue;
+}
