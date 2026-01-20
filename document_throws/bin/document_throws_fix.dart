@@ -30,11 +30,6 @@ Future<void> main(List<String> args) async {
       help: 'Include call/origin provenance in @Throwing.',
     )
     ..addFlag(
-      'always-add',
-      negatable: false,
-      help: 'Add @Throwing even when doc comments mention the exception.',
-    )
-    ..addFlag(
       'annotation',
       negatable: false,
       help: 'Use @Throwing annotations instead of doc comments.',
@@ -43,6 +38,11 @@ Future<void> main(List<String> args) async {
       'doc-comment',
       negatable: false,
       help: 'Force doc comment output (default).',
+    )
+    ..addFlag(
+      'honor-doc-mentions',
+      negatable: false,
+      help: 'Skip @Throwing when doc comments mention the exception.',
     );
 
   ArgResults parsed;
@@ -63,7 +63,7 @@ Future<void> main(List<String> args) async {
 
   final root = Directory.current.path;
   final includeSource = parsed['origin'] as bool;
-  final alwaysAdd = parsed['always-add'] as bool;
+  final honorDocMentions = parsed['honor-doc-mentions'] as bool;
   final forceAnnotation = parsed['annotation'] as bool;
   final forceDocComment = parsed['doc-comment'] as bool;
   if (forceAnnotation && forceDocComment) {
@@ -130,7 +130,7 @@ Future<void> main(List<String> args) async {
       libraryResult.units,
       externalLookup: externalLookup,
       includeSource: includeSource,
-      honorDocMentions: !alwaysAdd,
+      honorDocMentions: honorDocMentions,
       documentationStyle: documentationStyle,
     );
     if (editsByFile.isEmpty) continue;
