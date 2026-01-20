@@ -7,10 +7,9 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/error/error.dart';
 
 import 'document_thrown_exceptions_collection.dart';
-import 'document_thrown_exceptions_doc_comments.dart';
 import 'documentation_style.dart';
-import 'throws_cache_lookup.dart';
 import 'throwing_doc_parser.dart';
+import 'throws_cache_lookup.dart';
 
 class DocumentThrownExceptions extends MultiAnalysisRule {
   static const LintCode code = LintCode(
@@ -26,7 +25,7 @@ class DocumentThrownExceptions extends MultiAnalysisRule {
     correctionMessage: 'Use @Throwing(ExceptionType, ...) in doc comments.',
   );
   static const LintCode docMentionCode = LintCode(
-    'document_thrown_exceptions_unthrown_doc',
+    'unthrown_exceptions_documented',
     'Doc comment mentions exception types that are not thrown: {0}.',
     correctionMessage: 'Remove mentions for exceptions not thrown.',
   );

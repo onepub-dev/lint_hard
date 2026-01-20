@@ -25,7 +25,7 @@ The document_throws package implements:
  1. a lint to inform you when a method or function has not declared
  all exceptions: `document_thrown_exceptions`
  2. a lint to inform you when an exception which is documented isn't actually
- thrown: `document_thrown_exceptions_unthrown_doc`
+ thrown: `unthrown_exceptions_documented`
  3. a lint if the @Throwing documentation is malformed: `document_thrown_exceptions_malformed_doc`
  4. a lint that informs you if the required indexes don't exist: `throws_index_up_to_date`
 
