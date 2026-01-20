@@ -123,22 +123,6 @@ class _Visitor extends SimpleAstVisitor<void> {
       externalLookup: externalLookup,
     );
 
-    if (documentationStyle == DocumentationStyle.docComment) {
-      final mentions =
-          DocCommentAnalyzer().inlineMentionedTypes(documentationComment);
-      if (mentions.isNotEmpty) {
-        final unthrown = mentions.difference(thrownResults.types);
-        if (unthrown.isNotEmpty) {
-          final label = (unthrown.toList()..sort()).join(', ');
-          rule.reportAtToken(
-            reportToken,
-            diagnosticCode: DocumentThrownExceptions.docMentionCode,
-            arguments: [label],
-          );
-        }
-      }
-    }
-
     if (documentationStyle == DocumentationStyle.docComment &&
         documentationComment != null) {
       final parsed = parseThrowingDocComment(documentationComment);
@@ -157,6 +141,7 @@ class _Visitor extends SimpleAstVisitor<void> {
       metadata,
       documentationComment: documentationComment,
       documentationStyle: documentationStyle,
+      honorDocMentions: false,
       unitsByPath: unitsByPath,
       externalLookup: externalLookup,
       thrownResults: thrownResults,

@@ -37,6 +37,7 @@ void main() {
       body,
       metadata,
       documentationComment: documentationComment,
+      honorDocMentions: false,
       allowSourceFallback: allowSourceFallback,
       unitsByPath: unitsByPath,
       externalLookup: externalLookup,
@@ -103,7 +104,7 @@ void main() {
     expect(missing, isEmpty);
   });
 
-  test('accepts doc comment mentions without @Throwing tag', () {
+  test('does not accept doc comment mentions without @Throwing tag', () {
     final method = findMethod(unit, 'mentionedThrowWithoutTag');
     final missing = _missing(
       method.body,
@@ -112,10 +113,10 @@ void main() {
       allowSourceFallback: true,
     );
 
-    expect(missing, isEmpty);
+    expect(missing, equals({'BadStateException'}));
   });
 
-  test('reports doc comment mentions without throws', () {
+  test('ignores doc comment mention helpers when linting', () {
     final method = findMethod(unit, 'mentionedNoThrow');
     final missing = _missing(
       method.body,
@@ -123,50 +124,8 @@ void main() {
       method.documentationComment,
       allowSourceFallback: true,
     );
-    final mentioned = docCommentMentionsWithoutThrows(
-      method.body,
-      method.documentationComment,
-      unitsByPath: unitsByPath,
-    );
 
     expect(missing, isEmpty);
-    expect(mentioned, equals({'BadStateException'}));
-  });
-
-  test('ignores doc comment references without throw wording', () {
-    final method = findMethod(unit, 'mentionedNonThrow');
-    final missing = _missing(
-      method.body,
-      method.metadata,
-      method.documentationComment,
-      allowSourceFallback: true,
-    );
-    final mentioned = docCommentMentionsWithoutThrows(
-      method.body,
-      method.documentationComment,
-      unitsByPath: unitsByPath,
-    );
-
-    expect(missing, isEmpty);
-    expect(mentioned, isEmpty);
-  });
-
-  test('ignores references outside the throw sentence', () {
-    final method = findMethod(unit, 'mentionedThrowSentence');
-    final missing = _missing(
-      method.body,
-      method.metadata,
-      method.documentationComment,
-      allowSourceFallback: true,
-    );
-    final mentioned = docCommentMentionsWithoutThrows(
-      method.body,
-      method.documentationComment,
-      unitsByPath: unitsByPath,
-    );
-
-    expect(missing, isEmpty);
-    expect(mentioned, isEmpty);
   });
 
   test('ignores throws caught without rethrow', () {

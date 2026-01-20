@@ -45,6 +45,7 @@ class DocumentThrownExceptionsFix extends ResolvedCorrectionProducer {
       libraryResult.units,
       externalLookup: _externalLookupForPath(file),
       documentationStyle: documentationStyle,
+      honorDocMentions: false,
       onlyTarget: target,
     );
     if (editsByPath.isEmpty) return;

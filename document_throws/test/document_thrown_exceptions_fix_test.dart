@@ -373,32 +373,7 @@ void main() {
     expect(updated, contains('/// @Throwing(ArgumentError)\nvoid dsort('));
   });
 
-  test('fix skips adding @Throwing when doc comment mentions exception', () async {
-    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
-    final fixtureFilePath = File(fixturePath).absolute.path;
-    final resolved = await resolveFixture(fixtureFilePath);
-
-    final editsByFile = documentThrownExceptionEdits(
-      resolved.unit,
-      resolved.library.units,
-      documentationStyle: DocumentationStyle.docComment,
-    );
-    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
-    final content = await File(fixtureFilePath).readAsString();
-    final updated = _applyEdits(content, edits);
-
-    final signatureIndex = updated.indexOf('void mentionedThrowWithoutTag');
-    expect(signatureIndex, greaterThan(0));
-    final commentIndex = updated.lastIndexOf(
-      '/// Throws [BadStateException].',
-      signatureIndex,
-    );
-    expect(commentIndex, greaterThan(0));
-    final block = updated.substring(commentIndex, signatureIndex);
-    expect(block, isNot(contains('@Throwing(BadStateException)')));
-  });
-
-  test('fix adds @Throwing when forced even if doc mentions exception', () async {
+  test('fix adds @Throwing even when doc comment mentions exception', () async {
     final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
     final resolved = await resolveFixture(fixtureFilePath);
@@ -424,7 +399,33 @@ void main() {
     expect(block, contains('@Throwing(BadStateException)'));
   });
 
-  test('fix respects doc mentions in annotation mode', () async {
+  test('fix can honor doc comment mentions when requested', () async {
+    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = documentThrownExceptionEdits(
+      resolved.unit,
+      resolved.library.units,
+      documentationStyle: DocumentationStyle.docComment,
+      honorDocMentions: true,
+    );
+    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, edits);
+
+    final signatureIndex = updated.indexOf('void mentionedThrowWithoutTag');
+    expect(signatureIndex, greaterThan(0));
+    final commentIndex = updated.lastIndexOf(
+      '/// Throws [BadStateException].',
+      signatureIndex,
+    );
+    expect(commentIndex, greaterThan(0));
+    final block = updated.substring(commentIndex, signatureIndex);
+    expect(block, isNot(contains('@Throwing(BadStateException)')));
+  });
+
+  test('fix can honor doc mentions in annotation mode when requested', () async {
     final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
     final fixtureFilePath = File(fixturePath).absolute.path;
     final resolved = await resolveFixture(fixtureFilePath);
@@ -433,6 +434,7 @@ void main() {
       resolved.unit,
       resolved.library.units,
       documentationStyle: DocumentationStyle.annotation,
+      honorDocMentions: true,
     );
     final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
     final content = await File(fixtureFilePath).readAsString();
