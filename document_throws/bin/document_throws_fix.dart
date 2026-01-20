@@ -235,6 +235,8 @@ void _printUsage(ArgParser parser, {String? error}) {
   stdout.writeln(parser.usage);
   stdout.writeln('');
   stdout.writeln('Examples:');
-  stdout.writeln("  document_throws_fix 'lib/**/*.dart'");
-  stdout.writeln("  document_throws_fix 'lib/**/*.dart' 'test/**/*.dart'");
+  stdout.writeln("  dt_fix");
+  stdout.writeln("  dt_fix --origin");
+  stdout.writeln("  dt_fix 'lib/**/*.dart'");
+  stdout.writeln("  dt_fix 'lib/**/*.dart' 'test/**/*.dart'");
 }
