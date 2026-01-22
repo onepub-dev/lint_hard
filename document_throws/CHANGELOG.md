@@ -1,3 +1,6 @@
+# 0.2.1
+- improvements to the readme.
+
 # 0.2.0
 - Generally clean up around edge cases.
 - We no longer look for free form throws sentences in

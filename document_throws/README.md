@@ -53,7 +53,7 @@ for exceptions:
 
 ### Structured doc comment.
 The structured doc comment has two forms:
-  1. Basic @Throwing statement
+  1. Basic @Throwing statement (with an optional reason)
   2. Extended @Throwing statement that documents the origin of the exception.
 
   The Extended version is mainly used to debug the document_throws package
@@ -73,7 +73,8 @@ The basic form of the doc comment takes the form:
 
 ```
 /// @Throwing(ArgumentError)
-/// @Throwing(InvalidType)
+/// @Throwing(StateError)
+/// @Throwing(FileNotFound, reason: "The passed file does not exist")
 ```
 
 
@@ -93,7 +94,7 @@ The extended form of the doc comment takes the form:
 For both the doc comments and the annotations you can provide a reason
 as to why the exception is thrown.
 
-##### Basic:
+##### Doc Comment:
 ```
 /// @Throwing(ArgumentError, reason: "You passed an invalid argument")
 ```
@@ -114,7 +115,7 @@ declares the annotation.
 dart pub add document_throws_annotation
 ```
 
-To enable the alternate annotation method:
+To enable the annotation method:
 
 Add the annotation dependency, then configure document_throws to emit
 annotations instead of doc comments. After changing the setting, run the
@@ -151,7 +152,7 @@ exception and the list of exceptions.
 Both the bulk fix tool and the lints rely on the indexer.
 
 You will need to re-run the indexer each time you update your set of
-project  dependencies (inlcuding version changes) or when you update
+project  dependencies (including version changes) or when you update
 your Dart or Flutter SDK versions.
 
 
@@ -160,7 +161,7 @@ indexer is out of dart `throws_index_up_to_date`.
 
 
 The indexer places binary indexes into your PUB_CACHE directory.
-If you run `dart pub cache reset` or indices will also be reset
+If you run `dart pub cache reset` your indices will also be reset
 and you will need to re-run the index tool.
 
 The indexes are global, so whilst you need to run the indexer
@@ -175,14 +176,14 @@ code base (or a specific library) in a single pass.
 Before running the Bulk Fix tool you need to have first run the
 indexer in your applications project root.
 
-The build fix tool is able to add new @Throwing documentation as
-well as removing @Throwing documentaiton that no longer applies.
+The bulk fix tool is able to add new @Throwing documentation as
+well as removing @Throwing documentation that no longer applies.
 
 
 ## Installing document_throws
 
 ```
-dart pub add document_throws
+dart pub add --dev document_throws
 ```
 
 If you are using the (non-default) annotation form then you also
@@ -222,13 +223,13 @@ dt-index
 
 The indexer will take a few minutes the first time you run it.
 
-If your indexes get corrupted for some reason you can force them to be recreated
+If your indexes get corrupted, you can force them to be recreated
 via `dt-index --recreate`.
 
 ## Running the Bulk Fix tool
 
 NOTE: before running the bulk fix tool we recommend that you check in all
-current changes so that you can rever the bulk fix if it causes unexpected
+current changes so that you can revert the bulk fix if it causes unexpected
 problems.
 
 The bulk fix tool can add new exceptions or remove exceptions that no longer
@@ -256,19 +257,22 @@ cd <my Dart application root>
 dt-fix --annotation
 ```
 
-The `dart_throws` package includes a more detailed form of the @Throwing annotation
-that includes the name of the called method that throw the exception as
-well as the exact method that originates the thrown exception.  This 
-is mainly used to aid in debugging `document_throws` but it can sometimes
-be useful so we have made it availble via the public API.
+### Extended form
+The `dart_throws` package includes a more detailed form (the Extended form)
+of the @Throwing clause that includes the name of the called method that 
+throws the exception, as well as the exact method that originates the thrown 
+exception.  
+This is mainly used to aid in debugging `document_throws` but it can sometimes
+be useful during your own development, so we have made it availble via the 
+public API.
 
-To update your code base to use the detailed form run:
+To update your code base to use the Exteded form run:
 
 ```
 dt-fix --origin
 ```
 
-To revert back to the shorter form run:
+To revert back to the Basic form run:
 
 ```
 dt-fix
@@ -308,7 +312,7 @@ modified files after running the fix tool and exit non-zero when changes are
 present.
 
 ### Performance
-The indexer can take a few minutes to run so if possible store the PUB_CACHE
+The indexer can take a few minutes to run so if possible, store the PUB_CACHE
 on a persistent volume.
 
 ### GitHub Actions example

@@ -1,5 +1,5 @@
 name: document_throws
-version: 0.2.0
+version: 0.2.1
 homepage: https://github.com/noojee/lint_hard.git
 description: Document thrown exceptions via @Throwing annotations.
 repository: https://github.com/noojee/lint_hard.git
