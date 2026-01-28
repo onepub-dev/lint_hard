@@ -1,10 +1,10 @@
 name: lint_hard
-version: 7.1.1
+version: 7.1.2
 homepage: https://github.com/noojee/lint_hard.git
 description: All the lints except where they clash.
 repository: https://github.com/noojee/lint_hard.git
 environment:
-  sdk: '>=3.7.0 <4.0.0'
+  sdk: '>=3.10.0 <4.0.0'
 
 dependencies:
   analyzer: ^9.0.0

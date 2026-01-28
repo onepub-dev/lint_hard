@@ -168,7 +168,7 @@ linter:
     remove_deprecations_in_breaking_versions : true
     require_trailing_commas : false
     secure_pubspec_urls : true
-    simplify_variable_pattern : true
+    # simplify_variable_pattern : true # re-introduce after 3.11 is stable.
     sized_box_for_whitespace : true
     sized_box_shrink_expand : true
     slash_for_doc_comments : true

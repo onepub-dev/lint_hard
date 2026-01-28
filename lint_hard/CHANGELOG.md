@@ -1,3 +1,6 @@
+# 7.1.2
+- removed the lint simplify_variable_pattern as it isn't available until 3.11
+
 # 7.1.1
 - split the document_throws code into its own package and now depend on that.
 - numerous fixes to document_throws.
