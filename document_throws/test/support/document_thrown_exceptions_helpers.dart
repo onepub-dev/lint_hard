@@ -249,7 +249,7 @@ class _ConstructorFinder extends RecursiveAstVisitor<void> {
 
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
-    final matchesClass = node.returnType.name == className;
+    final matchesClass = _constructorEnclosingTypeName(node) == className;
     final constructorName = node.name?.lexeme;
     final matchesName = constructorName == name;
     if (matchesClass && matchesName) {
@@ -258,6 +258,20 @@ class _ConstructorFinder extends RecursiveAstVisitor<void> {
     }
     super.visitConstructorDeclaration(node);
   }
+}
+
+String? _constructorEnclosingTypeName(ConstructorDeclaration node) {
+  final parent = node.parent;
+  if (parent is ClassDeclaration) {
+    return parent.namePart.typeName.lexeme;
+  }
+  if (parent is EnumDeclaration) {
+    return parent.namePart.typeName.lexeme;
+  }
+  if (parent is ExtensionTypeDeclaration) {
+    return parent.primaryConstructor.typeName.lexeme;
+  }
+  return node.typeName?.name;
 }
 
 class _FunctionFinder extends RecursiveAstVisitor<void> {

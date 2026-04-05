@@ -6,6 +6,7 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/error/error.dart';
 
+import 'constructor_declaration_utils.dart';
 import 'document_thrown_exceptions.dart';
 import 'throwing_annotation.dart';
 import 'throwing_doc_parser.dart';
@@ -67,7 +68,7 @@ class _Visitor extends SimpleAstVisitor<void> {
       body: node.body,
       metadata: node.metadata,
       documentationComment: node.documentationComment,
-      reportToken: node.returnType.beginToken,
+      reportToken: constructorReportToken(node),
     );
   }
 

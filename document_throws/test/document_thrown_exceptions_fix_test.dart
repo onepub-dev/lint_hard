@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:analysis_server_plugin/edit/dart/correction_producer.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/diagnostic/diagnostic.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
+import 'package:document_throws/src/constructor_declaration_utils.dart';
 import 'package:document_throws/src/document_thrown_exceptions.dart';
 import 'package:document_throws/src/document_thrown_exceptions_fix.dart';
 import 'package:document_throws/src/document_thrown_exceptions_fix_utils.dart';
@@ -57,8 +59,21 @@ void main() {
     unit = resolvedUnit.unit;
   });
 
+  Token? _nodeNameToken(AstNode node) {
+    if (node is MethodDeclaration) {
+      return node.name;
+    }
+    if (node is FunctionDeclaration) {
+      return node.name;
+    }
+    if (node is ConstructorDeclaration) {
+      return constructorReportToken(node);
+    }
+    return null;
+  }
+
   Diagnostic _diagnostic(AstNode node) {
-    final name = node is NamedCompilationUnitMember ? node.name : null;
+    final name = _nodeNameToken(node);
     final offset = name?.offset ?? node.offset;
     final length = name?.length ?? node.length;
     return Diagnostic.forValues(
