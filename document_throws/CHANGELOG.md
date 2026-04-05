@@ -1,3 +1,7 @@
+# 0.3.0
+- Upgraded to the latest version of the dart analyzer.
+- Fix analyzer 12 constructor AST usage
+
 # 0.2.1
 - improvements to the readme.
 
