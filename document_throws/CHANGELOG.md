@@ -1,3 +1,7 @@
+# 1.0.0
+- Add dt-fix --remove option to remove @Throwing documentation an annotation
+from a project.
+
 # 0.3.0
 - Upgraded to the latest version of the dart analyzer.
 - Fix analyzer 12 constructor AST usage
