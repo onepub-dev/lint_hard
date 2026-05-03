@@ -17,33 +17,39 @@ import 'package:document_throws/src/throws_cache_lookup.dart';
 import 'package:document_throws/src/version/version.g.dart';
 
 Future<void> main(List<String> args) async {
-  final parser = ArgParser()
-    ..addFlag(
-      'help',
-      abbr: 'h',
-      negatable: false,
-      help: 'Show usage information.',
-    )
-    ..addFlag(
-      'origin',
-      negatable: false,
-      help: 'Include call/origin provenance in @Throwing.',
-    )
-    ..addFlag(
-      'annotation',
-      negatable: false,
-      help: 'Use @Throwing annotations instead of doc comments.',
-    )
-    ..addFlag(
-      'doc-comment',
-      negatable: false,
-      help: 'Force doc comment output (default).',
-    )
-    ..addFlag(
-      'honor-doc-mentions',
-      negatable: false,
-      help: 'Skip @Throwing when doc comments mention the exception.',
-    );
+  final parser =
+      ArgParser()
+        ..addFlag(
+          'help',
+          abbr: 'h',
+          negatable: false,
+          help: 'Show usage information.',
+        )
+        ..addFlag(
+          'origin',
+          negatable: false,
+          help: 'Include call/origin provenance in @Throwing.',
+        )
+        ..addFlag(
+          'annotation',
+          negatable: false,
+          help: 'Use @Throwing annotations instead of doc comments.',
+        )
+        ..addFlag(
+          'doc-comment',
+          negatable: false,
+          help: 'Force doc comment output (default).',
+        )
+        ..addFlag(
+          'honor-doc-mentions',
+          negatable: false,
+          help: 'Skip @Throwing when doc comments mention the exception.',
+        )
+        ..addFlag(
+          'remove',
+          negatable: false,
+          help: 'Remove existing @Throwing doc comments and annotations.',
+        );
 
   ArgResults parsed;
   try {
@@ -66,14 +72,16 @@ Future<void> main(List<String> args) async {
   final honorDocMentions = parsed['honor-doc-mentions'] as bool;
   final forceAnnotation = parsed['annotation'] as bool;
   final forceDocComment = parsed['doc-comment'] as bool;
+  final remove = parsed['remove'] as bool;
   if (forceAnnotation && forceDocComment) {
     _printUsage(parser, error: 'Choose one of --annotation or --doc-comment.');
     exitCode = 64;
     return;
   }
-  final forcedStyle = forceAnnotation
-      ? DocumentationStyle.annotation
-      : (forceDocComment ? DocumentationStyle.docComment : null);
+  final forcedStyle =
+      forceAnnotation
+          ? DocumentationStyle.annotation
+          : (forceDocComment ? DocumentationStyle.docComment : null);
   final patterns = parsed.rest;
   final summaryNotes = <String>[];
   if (includeSource) {
@@ -84,6 +92,9 @@ Future<void> main(List<String> args) async {
       'To remove provenance, rerun dt-fix without --origin to '
       'rewrite existing @Throwing entries without provenance.',
     );
+  }
+  if (remove) {
+    summaryNotes.add('Removed @Throwing doc comments and annotations.');
   }
   final files = await _collectDartFiles(patterns, root);
   if (files.isEmpty) {
@@ -104,35 +115,19 @@ Future<void> main(List<String> args) async {
     final unitResult = await session.getResolvedUnit(filePath);
     if (unitResult is! ResolvedUnitResult) continue;
 
-    final libraryResult = await _resolvedLibraryForFile(
-      session,
-      unitResult,
-      libraryCache,
-    );
-    if (libraryResult == null) continue;
-
-    final rootPath = findProjectRoot(filePath);
-    final externalLookup = rootPath == null
-        ? null
-        : lookupByRoot.putIfAbsent(
-            rootPath,
-            () => ThrowsCacheLookup.forProjectRoot(rootPath),
-          );
-    final documentationStyle = forcedStyle ??
-        (rootPath == null
-            ? DocumentationStyle.docComment
-            : styleByRoot.putIfAbsent(
-                rootPath,
-                () => documentationStyleForRoot(rootPath),
-              ));
-    final editsByFile = documentThrownExceptionEdits(
-      unitResult,
-      libraryResult.units,
-      externalLookup: externalLookup,
-      includeSource: includeSource,
-      honorDocMentions: honorDocMentions,
-      documentationStyle: documentationStyle,
-    );
+    final editsByFile =
+        remove
+            ? removeDocumentThrownExceptionEdits(unitResult)
+            : await _fixEditsByFile(
+              unitResult,
+              session,
+              libraryCache,
+              lookupByRoot,
+              styleByRoot,
+              forcedStyle,
+              includeSource: includeSource,
+              honorDocMentions: honorDocMentions,
+            );
     if (editsByFile.isEmpty) continue;
 
     for (final entry in editsByFile.entries) {
@@ -164,32 +159,49 @@ Future<List<String>> _collectDartFiles(
 ) async {
   final files = <String>{};
   if (patterns.isEmpty) {
-    await for (final entity in Directory(root).list(
-      recursive: true,
-      followLinks: false,
-    )) {
-      if (entity is! File) continue;
-      if (!entity.path.endsWith('.dart')) continue;
-      if (_isIgnoredPath(entity.path, root)) continue;
-      files.add(entity.path);
+    await for (final entity in Directory(
+      root,
+    ).list(recursive: true, followLinks: false)) {
+      _addDartFile(files, entity.path, root);
     }
     return files.toList()..sort();
   }
 
   for (final pattern in patterns) {
     final glob = Glob(pattern);
-    final entities = p.isAbsolute(pattern)
-        ? glob.listSync(followLinks: false)
-        : glob.listSync(root: root, followLinks: false);
+    final entities =
+        p.isAbsolute(pattern)
+            ? glob.listSync(followLinks: false)
+            : glob.listSync(root: root, followLinks: false);
     for (final entity in entities) {
-      if (entity is! File) continue;
-      if (!entity.path.endsWith('.dart')) continue;
-      if (_isIgnoredPath(entity.path, root)) continue;
-      files.add(p.normalize(entity.path));
+      if (FileSystemEntity.isFileSync(entity.path)) {
+        _addDartFile(files, entity.path, root);
+      } else if (FileSystemEntity.isDirectorySync(entity.path)) {
+        await _addDartFilesInDirectory(files, entity.path, root);
+      }
     }
   }
 
   return files.toList()..sort();
+}
+
+void _addDartFile(Set<String> files, String path, String root) {
+  if (!path.endsWith('.dart')) return;
+  if (_isIgnoredPath(path, root)) return;
+  files.add(p.normalize(path));
+}
+
+Future<void> _addDartFilesInDirectory(
+  Set<String> files,
+  String directoryPath,
+  String root,
+) async {
+  if (_isIgnoredPath(directoryPath, root)) return;
+  await for (final entity in Directory(
+    directoryPath,
+  ).list(recursive: true, followLinks: false)) {
+    _addDartFile(files, entity.path, root);
+  }
 }
 
 bool _isIgnoredPath(String path, String root) {
@@ -203,6 +215,49 @@ bool _isIgnoredPath(String path, String root) {
   return false;
 }
 
+Future<Map<String, List<SourceEdit>>> _fixEditsByFile(
+  ResolvedUnitResult unitResult,
+  AnalysisSession session,
+  Map<String, ResolvedLibraryResult> libraryCache,
+  Map<String, ThrowsCacheLookup?> lookupByRoot,
+  Map<String, DocumentationStyle> styleByRoot,
+  DocumentationStyle? forcedStyle, {
+  required bool includeSource,
+  required bool honorDocMentions,
+}) async {
+  final libraryResult = await _resolvedLibraryForFile(
+    session,
+    unitResult,
+    libraryCache,
+  );
+  if (libraryResult == null) return const <String, List<SourceEdit>>{};
+
+  final rootPath = findProjectRoot(unitResult.path);
+  final externalLookup =
+      rootPath == null
+          ? null
+          : lookupByRoot.putIfAbsent(
+            rootPath,
+            () => ThrowsCacheLookup.forProjectRoot(rootPath),
+          );
+  final documentationStyle =
+      forcedStyle ??
+      (rootPath == null
+          ? DocumentationStyle.docComment
+          : styleByRoot.putIfAbsent(
+            rootPath,
+            () => documentationStyleForRoot(rootPath),
+          ));
+  return documentThrownExceptionEdits(
+    unitResult,
+    libraryResult.units,
+    externalLookup: externalLookup,
+    includeSource: includeSource,
+    honorDocMentions: honorDocMentions,
+    documentationStyle: documentationStyle,
+  );
+}
+
 Future<ResolvedLibraryResult?> _resolvedLibraryForFile(
   AnalysisSession session,
   ResolvedUnitResult unitResult,
@@ -212,8 +267,9 @@ Future<ResolvedLibraryResult?> _resolvedLibraryForFile(
   final cached = cache[libraryPath];
   if (cached != null) return cached;
 
-  final libraryResult =
-      await session.getResolvedLibraryContaining(unitResult.path);
+  final libraryResult = await session.getResolvedLibraryContaining(
+    unitResult.path,
+  );
   if (libraryResult is! ResolvedLibraryResult) return null;
   cache[libraryPath] = libraryResult;
   return libraryResult;
@@ -226,7 +282,9 @@ void _printUsage(ArgParser parser, {String? error}) {
   }
   stdout.writeln('Apply document_throws fixes to Dart files.');
   stdout.writeln('');
-  stdout.writeln('Usage: document_throws_fix [options] [<glob> ...]');
+  stdout.writeln(
+    'Usage: document_throws_fix [options] [<glob|file|directory> ...]',
+  );
   stdout.writeln('');
   stdout.writeln('If no globs are provided, all .dart files under the');
   stdout.writeln('current directory are processed.');
@@ -235,8 +293,9 @@ void _printUsage(ArgParser parser, {String? error}) {
   stdout.writeln(parser.usage);
   stdout.writeln('');
   stdout.writeln('Examples:');
-  stdout.writeln("  dt_fix");
-  stdout.writeln("  dt_fix --origin");
-  stdout.writeln("  dt_fix 'lib/**/*.dart'");
-  stdout.writeln("  dt_fix 'lib/**/*.dart' 'test/**/*.dart'");
+  stdout.writeln("  dt-fix");
+  stdout.writeln("  dt-fix --origin");
+  stdout.writeln("  dt-fix --remove lib");
+  stdout.writeln("  dt-fix 'lib/**/*.dart'");
+  stdout.writeln("  dt-fix 'lib/**/*.dart' 'test/**/*.dart'");
 }

@@ -440,31 +440,34 @@ void main() {
     expect(block, isNot(contains('@Throwing(BadStateException)')));
   });
 
-  test('fix can honor doc mentions in annotation mode when requested', () async {
-    final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
-    final fixtureFilePath = File(fixturePath).absolute.path;
-    final resolved = await resolveFixture(fixtureFilePath);
+  test(
+    'fix can honor doc mentions in annotation mode when requested',
+    () async {
+      final fixturePath = 'test/fixtures/document_thrown_exceptions.dart';
+      final fixtureFilePath = File(fixturePath).absolute.path;
+      final resolved = await resolveFixture(fixtureFilePath);
 
-    final editsByFile = documentThrownExceptionEdits(
-      resolved.unit,
-      resolved.library.units,
-      documentationStyle: DocumentationStyle.annotation,
-      honorDocMentions: true,
-    );
-    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
-    final content = await File(fixtureFilePath).readAsString();
-    final updated = _applyEdits(content, edits);
+      final editsByFile = documentThrownExceptionEdits(
+        resolved.unit,
+        resolved.library.units,
+        documentationStyle: DocumentationStyle.annotation,
+        honorDocMentions: true,
+      );
+      final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+      final content = await File(fixtureFilePath).readAsString();
+      final updated = _applyEdits(content, edits);
 
-    final signatureIndex = updated.indexOf('void mentionedThrowWithoutTag');
-    expect(signatureIndex, greaterThan(0));
-    final commentIndex = updated.lastIndexOf(
-      '/// Throws [BadStateException].',
-      signatureIndex,
-    );
-    expect(commentIndex, greaterThan(0));
-    final block = updated.substring(commentIndex, signatureIndex);
-    expect(block, isNot(contains('@Throwing(BadStateException)')));
-  });
+      final signatureIndex = updated.indexOf('void mentionedThrowWithoutTag');
+      expect(signatureIndex, greaterThan(0));
+      final commentIndex = updated.lastIndexOf(
+        '/// Throws [BadStateException].',
+        signatureIndex,
+      );
+      expect(commentIndex, greaterThan(0));
+      final block = updated.substring(commentIndex, signatureIndex);
+      expect(block, isNot(contains('@Throwing(BadStateException)')));
+    },
+  );
 
   test('fix appends @Throwing tags to doc comments', () async {
     final fixturePath =
@@ -626,95 +629,104 @@ void main() {
     final updated = _applyEdits(content, edits);
 
     final lines = updated.split('\n');
-    final throwingLine =
-        lines.firstWhere((line) => line.contains('@Throwing(ArgumentError)'));
+    final throwingLine = lines.firstWhere(
+      (line) => line.contains('@Throwing(ArgumentError)'),
+    );
     final throwingIndex = lines.indexOf(throwingLine);
     final blankLine = throwingIndex > 0 ? lines[throwingIndex - 1] : '';
     expect(blankLine, equals('  ///'));
     expect(throwingLine.startsWith('  /// '), isTrue);
-  });
-
-  test('fix preserves indentation when updating existing @Throwing with origin',
-      () async {
-    final fixturePath =
-        'test/fixtures/document_thrown_exceptions_remove_origin_indent.dart';
-    final fixtureFilePath = File(fixturePath).absolute.path;
-    final resolved = await resolveFixture(fixtureFilePath);
-
-    final editsByFile = documentThrownExceptionEdits(
-      resolved.unit,
-      resolved.library.units,
-      includeSource: true,
-      documentationStyle: DocumentationStyle.docComment,
-    );
-    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
-    expect(edits, isNotEmpty);
-    final content = await File(fixtureFilePath).readAsString();
-    final updated = _applyEdits(content, edits);
-
-    final lines = updated.split('\n');
-    final throwingLine =
-        lines.firstWhere((line) => line.contains('@Throwing('));
-    final throwingIndex = lines.indexOf(throwingLine);
-    final blankLine = throwingIndex > 0 ? lines[throwingIndex - 1] : '';
-    expect(blankLine, equals('  ///'));
-    expect(throwingLine.startsWith('  /// '), isTrue);
-  });
-
-  test('fix preserves wide indentation when updating existing @Throwing',
-      () async {
-    final fixturePath =
-        'test/fixtures/document_thrown_exceptions_remove_origin_indent_wide.dart';
-    final fixtureFilePath = File(fixturePath).absolute.path;
-    final resolved = await resolveFixture(fixtureFilePath);
-
-    final editsByFile = documentThrownExceptionEdits(
-      resolved.unit,
-      resolved.library.units,
-      includeSource: false,
-      documentationStyle: DocumentationStyle.docComment,
-    );
-    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
-    expect(edits, isNotEmpty);
-    final content = await File(fixtureFilePath).readAsString();
-    final updated = _applyEdits(content, edits);
-
-    final lines = updated.split('\n');
-    final throwingLine =
-        lines.firstWhere((line) => line.contains('@Throwing(ArgumentError)'));
-    final throwingIndex = lines.indexOf(throwingLine);
-    final blankLine = throwingIndex > 0 ? lines[throwingIndex - 1] : '';
-    expect(blankLine, equals('    ///'));
-    expect(throwingLine.startsWith('    /// '), isTrue);
   });
 
   test(
-      'fix preserves wide indentation when updating existing @Throwing with origin',
-      () async {
-    final fixturePath =
-        'test/fixtures/document_thrown_exceptions_remove_origin_indent_wide.dart';
-    final fixtureFilePath = File(fixturePath).absolute.path;
-    final resolved = await resolveFixture(fixtureFilePath);
+    'fix preserves indentation when updating existing @Throwing with origin',
+    () async {
+      final fixturePath =
+          'test/fixtures/document_thrown_exceptions_remove_origin_indent.dart';
+      final fixtureFilePath = File(fixturePath).absolute.path;
+      final resolved = await resolveFixture(fixtureFilePath);
 
-    final editsByFile = documentThrownExceptionEdits(
-      resolved.unit,
-      resolved.library.units,
-      includeSource: true,
-      documentationStyle: DocumentationStyle.docComment,
-    );
-    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
-    expect(edits, isNotEmpty);
-    final content = await File(fixtureFilePath).readAsString();
-    final updated = _applyEdits(content, edits);
+      final editsByFile = documentThrownExceptionEdits(
+        resolved.unit,
+        resolved.library.units,
+        includeSource: true,
+        documentationStyle: DocumentationStyle.docComment,
+      );
+      final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+      expect(edits, isNotEmpty);
+      final content = await File(fixtureFilePath).readAsString();
+      final updated = _applyEdits(content, edits);
 
-    final lines = updated.split('\n');
-    final throwingLine =
-        lines.firstWhere((line) => line.contains('@Throwing('));
-    final throwingIndex = lines.indexOf(throwingLine);
-    final blankLine = throwingIndex > 0 ? lines[throwingIndex - 1] : '';
-    expect(blankLine, equals('    ///'));
-    expect(throwingLine.startsWith('    /// '), isTrue);
-  });
+      final lines = updated.split('\n');
+      final throwingLine = lines.firstWhere(
+        (line) => line.contains('@Throwing('),
+      );
+      final throwingIndex = lines.indexOf(throwingLine);
+      final blankLine = throwingIndex > 0 ? lines[throwingIndex - 1] : '';
+      expect(blankLine, equals('  ///'));
+      expect(throwingLine.startsWith('  /// '), isTrue);
+    },
+  );
+
+  test(
+    'fix preserves wide indentation when updating existing @Throwing',
+    () async {
+      final fixturePath =
+          'test/fixtures/document_thrown_exceptions_remove_origin_indent_wide.dart';
+      final fixtureFilePath = File(fixturePath).absolute.path;
+      final resolved = await resolveFixture(fixtureFilePath);
+
+      final editsByFile = documentThrownExceptionEdits(
+        resolved.unit,
+        resolved.library.units,
+        includeSource: false,
+        documentationStyle: DocumentationStyle.docComment,
+      );
+      final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+      expect(edits, isNotEmpty);
+      final content = await File(fixtureFilePath).readAsString();
+      final updated = _applyEdits(content, edits);
+
+      final lines = updated.split('\n');
+      final throwingLine = lines.firstWhere(
+        (line) => line.contains('@Throwing(ArgumentError)'),
+      );
+      final throwingIndex = lines.indexOf(throwingLine);
+      final blankLine = throwingIndex > 0 ? lines[throwingIndex - 1] : '';
+      expect(blankLine, equals('    ///'));
+      expect(throwingLine.startsWith('    /// '), isTrue);
+    },
+  );
+
+  test(
+    'fix preserves wide indentation when updating existing @Throwing with origin',
+    () async {
+      final fixturePath =
+          'test/fixtures/document_thrown_exceptions_remove_origin_indent_wide.dart';
+      final fixtureFilePath = File(fixturePath).absolute.path;
+      final resolved = await resolveFixture(fixtureFilePath);
+
+      final editsByFile = documentThrownExceptionEdits(
+        resolved.unit,
+        resolved.library.units,
+        includeSource: true,
+        documentationStyle: DocumentationStyle.docComment,
+      );
+      final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+      expect(edits, isNotEmpty);
+      final content = await File(fixtureFilePath).readAsString();
+      final updated = _applyEdits(content, edits);
+
+      final lines = updated.split('\n');
+      final throwingLine = lines.firstWhere(
+        (line) => line.contains('@Throwing('),
+      );
+      final throwingIndex = lines.indexOf(throwingLine);
+      final blankLine = throwingIndex > 0 ? lines[throwingIndex - 1] : '';
+      expect(blankLine, equals('    ///'));
+      expect(throwingLine.startsWith('    /// '), isTrue);
+    },
+  );
 
   test('fix preserves blank doc comment lines without extra spaces', () async {
     final fixturePath =
@@ -757,5 +769,64 @@ void main() {
     expect(updated, contains('///  * [restoreFile]'));
     expect(updated, contains('///  * [withFileProtectionAsync]'));
     expect(updated, isNot(contains('/// * [restoreFile]')));
+  });
+
+  test('remove deletes @Throwing doc comments and annotations', () async {
+    final fixturePath =
+        'test/fixtures/document_thrown_exceptions_switch_style.dart';
+    final fixtureFilePath = File(fixturePath).absolute.path;
+    final resolved = await resolveFixture(fixtureFilePath);
+
+    final editsByFile = removeDocumentThrownExceptionEdits(resolved.unit);
+    final edits = editsByFile[fixtureFilePath] ?? const <SourceEdit>[];
+    expect(edits, isNotEmpty);
+    final content = await File(fixtureFilePath).readAsString();
+    final updated = _applyEdits(content, edits);
+
+    expect(updated, isNot(contains('@Throwing(')));
+    expect(updated, isNot(contains('document_throws_annotation')));
+    expect(updated, contains('void annotatedMethod()'));
+    expect(updated, contains('void documentedMethod()'));
+  });
+
+  test('dt-fix --remove accepts a directory filter', () async {
+    final temp = await Directory.systemTemp.createTemp(
+      'document_throws_remove_',
+    );
+    addTearDown(() => temp.delete(recursive: true));
+    await File(
+      '${temp.path}/pubspec.yaml',
+    ).writeAsString('name: remove_test\n');
+    final lib = Directory('${temp.path}/lib');
+    await lib.create();
+    final file = File('${lib.path}/sample.dart');
+    await file.writeAsString('''
+import 'package:document_throws_annotation/document_throws_annotation.dart';
+
+class BadStateException implements Exception {}
+
+@Throwing(BadStateException)
+void annotated() {
+  throw BadStateException();
+}
+
+/// Existing documentation.
+/// @Throwing(BadStateException)
+void documented() {
+  throw BadStateException();
+}
+''');
+
+    final result = await Process.run(Platform.resolvedExecutable, [
+      File('bin/document_throws_fix.dart').absolute.path,
+      '--remove',
+      'lib',
+    ], workingDirectory: temp.path);
+
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    final updated = await file.readAsString();
+    expect(updated, isNot(contains('@Throwing(')));
+    expect(updated, isNot(contains('document_throws_annotation')));
+    expect(updated, contains('/// Existing documentation.'));
   });
 }
