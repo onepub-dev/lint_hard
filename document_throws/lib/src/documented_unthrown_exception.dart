@@ -21,7 +21,7 @@ class ThrowingUnthrownException extends AnalysisRule {
 
   ThrowingUnthrownException()
     : super(
-        name: code.name,
+        name: code.lowerCaseName,
         description:
             'Warn when @Throwing documents exception types that are not '
             'thrown by the executable.',

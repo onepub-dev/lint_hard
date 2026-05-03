@@ -34,7 +34,7 @@ class DocumentThrownExceptions extends MultiAnalysisRule {
   // Configure the lint rule metadata.
   DocumentThrownExceptions()
     : super(
-        name: code.name,
+        name: code.lowerCaseName,
         description:
             'Require @Throwing documentation for each exception class thrown '
             'by a method.',

@@ -16,7 +16,7 @@ class ThrowsIndexUpToDate extends AnalysisRule {
 
   ThrowsIndexUpToDate()
     : super(
-        name: code.name,
+        name: code.lowerCaseName,
         description:
             'Warn when the throws cache for SDK or packages is missing.',
       );
