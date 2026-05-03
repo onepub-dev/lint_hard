@@ -11,3 +11,4 @@ doc/api/
 .history
 .failed_tracker
 logs
+document_throws/.mcp_logs/
