@@ -250,6 +250,24 @@ If you want to honor free-form mentions when running the fix tool, pass:
 dt-fix --honor-doc-mentions
 ```
 
+To remove all `@Throwing` documentation from matched Dart files, use
+`--remove`. This removes structured `@Throwing(...)` doc comment entries,
+`@Throwing(...)` annotations, and the `document_throws_annotation` import
+when it is no longer needed by those annotations.
+
+```
+dt-fix --remove
+```
+
+The remove command accepts the same filters as the normal fix command. You can
+pass a Dart file, a directory, or one or more glob patterns:
+
+```
+dt-fix --remove lib
+dt-fix --remove lib/src/example.dart
+dt-fix --remove 'lib/**/*.dart' 'test/**/*.dart'
+```
+
 If you want use the annotation form rather than the doc comment form then run:
 
 ```
