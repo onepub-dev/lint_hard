@@ -24,7 +24,7 @@ void main() {
         '''
 name: lint_hard_plugin_integration_test
 environment:
-  sdk: '>=3.7.0 <4.0.0'
+  sdk: '>=3.13.0 <4.0.0'
 ''',
       );
 

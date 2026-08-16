@@ -213,5 +213,5 @@ class _ClassOrMixinDecl {
 
   // Return members for the stored class or mixin.
   List<ClassMember> get members =>
-      classDecl != null ? classDecl!.members : mixinDecl!.members;
+      classDecl != null ? classDecl!.body.members : mixinDecl!.body.members;
 }

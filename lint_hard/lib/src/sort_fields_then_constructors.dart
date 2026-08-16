@@ -15,11 +15,11 @@ class FieldsFirstConstructorsNext extends AnalysisRule {
 
   // Configure the lint rule metadata.
   FieldsFirstConstructorsNext()
-      : super(
-          name: code.name,
-          description:
-              'Ensure fields come first, constructors next, then other members.',
-        );
+    : super(
+        name: code.name,
+        description:
+            'Ensure fields come first, constructors next, then other members.',
+      );
 
   @override
   // Expose lint code for registration and fixes.
@@ -47,15 +47,15 @@ class _Visitor extends SimpleAstVisitor<void> {
   @override
   // Report when a class has members in the wrong order.
   void visitClassDeclaration(ClassDeclaration node) {
-    if (_needsReorder(node.members)) {
-      rule.reportAtToken(node.name);
+    if (_needsReorder(node.body.members)) {
+      rule.reportAtToken(node.namePart.typeName);
     }
   }
 
   @override
   // Report when a mixin has members in the wrong order.
   void visitMixinDeclaration(MixinDeclaration node) {
-    if (_needsReorder(node.members)) {
+    if (_needsReorder(node.body.members)) {
       rule.reportAtToken(node.name);
     }
   }
@@ -76,8 +76,9 @@ class _Visitor extends SimpleAstVisitor<void> {
     if (ctorIdxs.isEmpty) return false;
 
     final firstCtor = ctorIdxs.reduce((a, b) => a < b ? a : b);
-    final lastField =
-        fieldIdxs.isNotEmpty ? fieldIdxs.reduce((a, b) => a > b ? a : b) : -1;
+    final lastField = fieldIdxs.isNotEmpty
+        ? fieldIdxs.reduce((a, b) => a > b ? a : b)
+        : -1;
 
     // Any ctor before the last field?
     if (lastField >= 0 && ctorIdxs.any((c) => c < lastField)) return true;

@@ -1,3 +1,7 @@
+# 8.0.0
+- require Dart 3.13 or later.
+- add the lint rules introduced in Dart 3.11, 3.12, and 3.13.
+
 # 7.1.2
 - removed the lint simplify_variable_pattern as it isn't available until 3.11
 

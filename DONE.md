@@ -1,4 +1,7 @@
 
+- [x] Update the supported lint set for Dart 3.13 and raise the minimum Dart
+version to 3.13.
+
 - [x] can the throws annotation allow the user to add a description for
 each throw - i.e a reason is thrown.
 
