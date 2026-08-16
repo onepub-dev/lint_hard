@@ -35,16 +35,18 @@ class ThrownTypeAnalyzer {
     ThrowsCacheLookup? externalLookup,
     bool includeLineNumbersForAll = false,
   }) {
-    final effectiveUnitProvider = unitProvider ??
+    final effectiveUnitProvider =
+        unitProvider ??
         (unitsByPath == null ? null : MapUnitProvider(unitsByPath));
-    final effectiveResolver = resolver ??
+    final effectiveResolver =
+        resolver ??
         (effectiveUnitProvider == null
             ? null
             : ThrownTypeResolver(
-                effectiveUnitProvider,
-                externalLookup: externalLookup,
-                includeLineNumbersForAll: includeLineNumbersForAll,
-              ));
+              effectiveUnitProvider,
+              externalLookup: externalLookup,
+              includeLineNumbersForAll: includeLineNumbersForAll,
+            ));
     final collector = ThrownTypeCollector(effectiveResolver);
     body.accept(collector);
     return ThrownTypeResults(
@@ -141,10 +143,7 @@ class ThrownTypeAnalyzer {
         byName[info.name] = info;
         continue;
       }
-      final mergedProvenance = [
-        ...existing.provenance,
-        ...info.provenance,
-      ];
+      final mergedProvenance = [...existing.provenance, ...info.provenance];
       final mergedType = existing.type ?? info.type;
       byName[info.name] = ThrownTypeInfo(
         info.name,
@@ -320,7 +319,7 @@ Set<String> _annotationThrownTypes(NodeList<Annotation>? metadata) {
     if (_annotationName(annotation) != throwingAnnotationName) continue;
     final args = annotation.arguments?.arguments;
     if (args == null || args.isEmpty) continue;
-    final first = args.first;
+    final first = args.first.argumentExpression;
     if (first is ListLiteral) continue;
     final normalized = _extractThrowTypeName(first);
     if (normalized != null) {

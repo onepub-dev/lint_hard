@@ -10,7 +10,7 @@ String? constructorEnclosingTypeName(ConstructorDeclaration node) {
     return parent.namePart.typeName.lexeme;
   }
   if (parent is ExtensionTypeDeclaration) {
-    return parent.primaryConstructor.typeName.lexeme;
+    return parent.namePart.typeName.lexeme;
   }
   return node.typeName?.name;
 }

@@ -16,7 +16,7 @@ class FieldsFirstConstructorsNext extends AnalysisRule {
   // Configure the lint rule metadata.
   FieldsFirstConstructorsNext()
     : super(
-        name: code.name,
+        name: code.lowerCaseName,
         description:
             'Ensure fields come first, constructors next, then other members.',
       );

@@ -212,7 +212,8 @@ class LongProvenanceLookup extends ThrowsCacheLookup {
           'FormatException',
           provenance: [
             ThrowsProvenance(
-              call: 'package:very_long_package_name/src/long_path.dart|VeryLongClassName#veryLongMethodName(int,String,Map<String,String>)',
+              call:
+                  'package:very_long_package_name/src/long_path.dart|VeryLongClassName#veryLongMethodName(int,String,Map<String,String>)',
               origin:
                   'package:very_long_package_name/src/other_path.dart|VeryLongClassName#veryLongOriginMethodName(int,String,Map<String,String>)',
             ),
@@ -269,7 +270,7 @@ String? _constructorEnclosingTypeName(ConstructorDeclaration node) {
     return parent.namePart.typeName.lexeme;
   }
   if (parent is ExtensionTypeDeclaration) {
-    return parent.primaryConstructor.typeName.lexeme;
+    return parent.namePart.typeName.lexeme;
   }
   return node.typeName?.name;
 }

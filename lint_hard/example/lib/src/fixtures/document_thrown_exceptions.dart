@@ -1,15 +1,18 @@
-class BadStateException implements Exception {}
+class BadStateException implements Exception;
 
 class Thrower {
-  Thrower() {
+  new() {
     throw BadStateException();
   }
 
   /// @Throwing(BadStateException)
-  Thrower.named() {
+  new named() {
     throw BadStateException();
   }
 
+  // Do not add @Throwing to this method, as it exists to test
+  // that undocumented methods are correctly identified as missing
+  // documentation.
   void undocumentedMethod() {
     throw BadStateException();
   }
@@ -20,6 +23,8 @@ class Thrower {
   }
 }
 
+// Do not add @Throwing to this method, as it exists to test
+// that undocumented methods are correctly identified as missing documentation.
 void undocumentedTopLevel() {
   throw BadStateException();
 }

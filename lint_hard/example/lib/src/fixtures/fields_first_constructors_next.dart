@@ -1,5 +1,5 @@
 class MisorderedMembers {
   final String name;
 
-  MisorderedMembers(this.name);
+  new(this.name);
 }

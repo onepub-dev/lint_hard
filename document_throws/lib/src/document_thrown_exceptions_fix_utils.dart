@@ -11,9 +11,9 @@ import 'package:path/path.dart' as p;
 
 import 'document_thrown_exceptions.dart';
 import 'documentation_style.dart';
+import 'throwing_annotation.dart';
 import 'throws_cache.dart';
 import 'throws_cache_lookup.dart';
-import 'throwing_annotation.dart';
 
 Map<String, List<SourceEdit>> documentThrownExceptionEdits(
   ResolvedUnitResult unitResult,
@@ -415,8 +415,8 @@ bool _annotationHasProvenance(Annotation annotation) {
   final arguments = annotation.arguments?.arguments;
   if (arguments == null) return false;
   for (final argument in arguments) {
-    if (argument is! NamedExpression) continue;
-    final name = argument.name.label.name;
+    if (argument is! NamedArgument) continue;
+    final name = argument.name.lexeme;
     if (name == 'call' || name == 'origin') {
       return true;
     }
@@ -592,7 +592,7 @@ Set<String> _annotationThrownTypes(NodeList<Annotation>? metadata) {
     if (_annotationName(annotation) != throwingAnnotationName) continue;
     final args = annotation.arguments?.arguments;
     if (args == null || args.isEmpty) continue;
-    final first = args.first;
+    final first = args.first.argumentExpression;
     if (first is ListLiteral) continue;
     final normalized = _normalizeTypeName(first.toSource());
     if (normalized != null) {
@@ -605,7 +605,7 @@ Set<String> _annotationThrownTypes(NodeList<Annotation>? metadata) {
 String? _annotationTypeName(Annotation annotation) {
   final args = annotation.arguments?.arguments;
   if (args == null || args.isEmpty) return null;
-  final first = args.first;
+  final first = args.first.argumentExpression;
   if (first is ListLiteral) return null;
   return _normalizeTypeName(first.toSource());
 }
@@ -639,9 +639,9 @@ Map<String, String> _annotationReasonByType(NodeList<Annotation>? metadata) {
     final args = annotation.arguments?.arguments;
     if (args == null) continue;
     for (final arg in args) {
-      if (arg is! NamedExpression) continue;
-      if (arg.name.label.name != 'reason') continue;
-      map[name] = arg.expression.toSource();
+      if (arg is! NamedArgument) continue;
+      if (arg.name.lexeme != 'reason') continue;
+      map[name] = arg.argumentExpression.toSource();
     }
   }
   return map;
