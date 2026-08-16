@@ -1,3 +1,7 @@
+# 1.1.0
+- Fix Dart 3.13 analyzer compatibility
+- Add Dart 3.13 lint support
+
 # 1.0.0
 - Add dt-fix --remove option to remove @Throwing documentation an annotation
 from a project.
