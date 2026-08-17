@@ -196,7 +196,6 @@ linter:
     unawaited_futures : true
     unintended_html_in_doc_comment : true
     unnecessary_async : true
-    unnecessary_await_in_return : true
     unnecessary_brace_in_string_interps : true
     unnecessary_breaks : true
     unnecessary_const : true
