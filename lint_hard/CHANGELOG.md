@@ -1,3 +1,6 @@
+# 8.0.1
+- removed the older conflicting lint async_return_with_no_await. Dart now recommends the newer async_return_with_no_await for cleaner stack traces.
+
 # 8.0.0
 - require Dart 3.13 or later.
 - add the lint rules introduced in Dart 3.11, 3.12, and 3.13.
